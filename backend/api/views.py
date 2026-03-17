@@ -52,6 +52,7 @@ from .serializers import (
     EventoSerializer,
     HerramientaSerializer,
     HerramientaAsignacionSerializer,
+    LoginSerializer,
     MovimientoFinancieroClienteSerializer,
     MovimientoInventarioSerializer,
     OrdenCompraSerializer,
@@ -100,6 +101,7 @@ class AdminOnlyViewSet(RoleContextMixin, viewsets.ModelViewSet):
 
 
 class CustomAuthToken(ObtainAuthToken):
+    serializer_class = LoginSerializer
     authentication_classes = []
     permission_classes = [AllowAny]
 

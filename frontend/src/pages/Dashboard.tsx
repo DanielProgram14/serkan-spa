@@ -2,12 +2,12 @@
 import { 
   Box, Typography, Paper, Stack, Avatar, Divider, Chip, 
   CircularProgress, List, ListItem, ListItemAvatar, ListItemText, 
-  Card, CardContent, Button, Tooltip
+  Card, CardContent, Button
 } from '@mui/material';
 import { 
   WarningAmber, ErrorOutline, Assignment, Description, 
   Timeline, Schedule, FolderOpen, TaskAlt, Warehouse, ShoppingCart,
-  TrendingDown, CheckCircle
+  TrendingDown, CheckCircle, InfoOutlined
 } from '@mui/icons-material';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
@@ -36,6 +36,7 @@ interface AlertaCritica {
 }
 
 interface EventoCalendario {
+  id?: number;
   fecha: string;
   tipo: 'tarea' | 'orden' | 'inventario';
   titulo: string;
@@ -69,6 +70,30 @@ const formatDateTimeSafe = (value?: string) => {
 const getTimeSafe = (value?: string) => {
   const d = parseDateSafe(value);
   return d ? d.getTime() : 0;
+};
+
+const sectionTitleSx = {
+  mb: 2,
+  color: '#0f172a',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 1,
+  letterSpacing: '0.2px'
+};
+
+const panelSx = {
+  p: { xs: 2, md: 2.5 },
+  border: '1px solid #e2e8f0',
+  borderRadius: 3,
+  bgcolor: '#ffffff',
+  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)'
+};
+
+const subtleCardSx = {
+  border: '1px solid #e2e8f0',
+  borderRadius: 3,
+  bgcolor: '#ffffff',
+  boxShadow: '0 6px 18px rgba(15, 23, 42, 0.06)'
 };
 
 const Dashboard = () => {
@@ -277,6 +302,7 @@ const Dashboard = () => {
           const fecha = new Date(t.fecha_limite);
           if (fecha.getMonth() === mesActual.getMonth() && fecha.getFullYear() === mesActual.getFullYear()) {
             eventos.push({
+              id: t.id,
               fecha: t.fecha_limite,
               tipo: 'tarea',
               titulo: t.nombre,
@@ -290,6 +316,7 @@ const Dashboard = () => {
           const fecha = new Date(o.fecha_orden);
           if (fecha.getMonth() === mesActual.getMonth() && fecha.getFullYear() === mesActual.getFullYear()) {
             eventos.push({
+              id: o.id,
               fecha: o.fecha_orden,
               tipo: 'orden',
               titulo: `Orden: ${o.numero}`,
@@ -326,23 +353,63 @@ const Dashboard = () => {
   }, [user, mesActual]);
 
   const visibleAlertas = showAllAlerts ? alertasCriticas : alertasCriticas.slice(0, 5);
+  const alertSummary = alertasCriticas.reduce(
+    (acc, alerta) => {
+      acc[alerta.severidad] += 1;
+      return acc;
+    },
+    { alto: 0, medio: 0, bajo: 0 }
+  );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const agendaItems = eventosCalendario
+    .map((evento) => ({
+      ...evento,
+      dateObj: parseDateSafe(evento.fecha),
+    }))
+    .filter((evento) => evento.dateObj && evento.dateObj.getTime() >= today.getTime())
+    .sort((a, b) => (a.dateObj?.getTime() || 0) - (b.dateObj?.getTime() || 0))
+    .slice(0, 8);
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
 
   // Componente de Tarjeta KPI Reutilizable
   const KpiCard = ({ title, value, icon, color, borderColor, badge }: any) => (
-    <Paper elevation={0} sx={{ p: 2, borderLeft: `5px solid ${borderColor}`, bgcolor: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', flex: 1, position: 'relative' }}>
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2.25,
+        borderLeft: `5px solid ${borderColor}`,
+        borderRadius: 3,
+        border: '1px solid #e2e8f0',
+        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+        boxShadow: '0 10px 20px rgba(15, 23, 42, 0.08)',
+        flex: 1,
+        position: 'relative',
+        transition: 'transform 160ms ease, box-shadow 160ms ease',
+        '&:hover': {
+          transform: 'translateY(-2px)',
+          boxShadow: '0 14px 28px rgba(15, 23, 42, 0.12)'
+        }
+      }}
+    >
         {badge && (
-          <Box sx={{ position: 'absolute', top: 10, right: 10, bgcolor: '#ef4444', color: 'white', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold' }}>
+          <Box sx={{ position: 'absolute', top: 12, right: 12, bgcolor: '#ef4444', color: 'white', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold', boxShadow: '0 6px 12px rgba(239, 68, 68, 0.35)' }}>
             {badge}
           </Box>
         )}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
             <Box>
-                <Typography variant="caption" fontWeight="bold" color="text.secondary">{title}</Typography>
-                <Typography variant="h4" fontWeight="800" color="#1e293b">{value}</Typography>
+                <Typography variant="caption" fontWeight="700" color="text.secondary" sx={{ letterSpacing: '0.5px' }}>
+                  {title}
+                </Typography>
+                <Typography variant="h4" fontWeight="800" color="#0f172a">{value}</Typography>
             </Box>
-            <Avatar sx={{ bgcolor: color.bg, color: color.text, width: 44, height: 44, flexShrink: 0 }}>{icon}</Avatar>
+            <Avatar sx={{ bgcolor: color.bg, color: color.text, width: 46, height: 46, flexShrink: 0, boxShadow: '0 6px 14px rgba(15, 23, 42, 0.12)' }}>
+              {icon}
+            </Avatar>
         </Box>
     </Paper>
   );
@@ -356,11 +423,13 @@ const Dashboard = () => {
     };
     const color = colorMap[alerta.severidad];
     const Icon = color.icon;
+    const isTaskAlert = alerta.tipo === 'TAREA_URGENTE' && typeof alerta.id === 'string' && alerta.id.startsWith('task-');
+    const taskId = isTaskAlert ? Number(alerta.id.replace('task-', '')) : null;
 
     return (
-      <Card sx={{ borderLeft: `4px solid ${color.border}`, bgcolor: color.bg, mb: 1 }}>
-        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 }, display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <Icon sx={{ color: color.border, mt: 0.5 }} />
+      <Card sx={{ borderLeft: `4px solid ${color.border}`, bgcolor: color.bg, mb: 1.25, borderRadius: 2.5, border: `1px solid ${color.border}33`, boxShadow: '0 6px 14px rgba(15, 23, 42, 0.06)' }}>
+        <CardContent sx={{ py: 1.75, '&:last-child': { pb: 1.75 }, display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <Icon sx={{ color: color.border, mt: 0.25 }} />
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle2" fontWeight="600" sx={{ color: color.text }}>
               {alerta.titulo}
@@ -369,81 +438,193 @@ const Dashboard = () => {
               {alerta.descripcion}
             </Typography>
             {alerta.fecha && (
-              <Typography variant="caption" color="text.secondary">
-                📅 {formatDateSafe(alerta.fecha)}
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                <Schedule sx={{ fontSize: 14 }} />
+                {formatDateSafe(alerta.fecha)}
               </Typography>
             )}
           </Box>
           <Chip 
             label={alerta.severidad.toUpperCase()} 
             size="small" 
-            sx={{ bgcolor: color.border, color: 'white', fontWeight: 'bold', fontSize: '0.65rem' }}
+            sx={{ bgcolor: color.border, color: 'white', fontWeight: 'bold', fontSize: '0.65rem', letterSpacing: '0.5px' }}
           />
+          {isTaskAlert && taskId && (
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => {
+                setSelectedTaskId(taskId);
+                setTaskModalOpen(true);
+              }}
+            >
+              Ver tarea
+            </Button>
+          )}
         </CardContent>
       </Card>
     );
   };
 
   return (
-    <Box sx={{ width: '100%' }}>
+    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 4 }}>
       {/* HEADER CON INFORMACIÓN DEL ROL */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="700" color="#1e293b">Panel de Control</Typography>
-        <Typography variant="body1" color="text.secondary">
-          Visión estratégica en tiempo real
-        </Typography>
-        {/* Chip de rol con información */}
-        <Box sx={{ mt: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
-          <Chip 
-            label={`Rol: ${user?.rol || 'SIN ROL'}`}
-            color="primary"
-            variant="outlined"
-            sx={{ fontWeight: 'bold' }}
-          />
-          {user?.area && (
+      <Paper elevation={0} sx={{ p: { xs: 2.5, md: 3.5 }, borderRadius: 4, border: '1px solid #e2e8f0', background: 'linear-gradient(120deg, #ffffff 0%, #f1f5f9 55%, #eef2ff 100%)', boxShadow: '0 16px 30px rgba(15, 23, 42, 0.08)' }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between">
+          <Box>
+            <Typography variant="h4" fontWeight="800" color="#0f172a" sx={{ letterSpacing: '-0.4px' }}>
+              Panel de Control
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
+              Visión estratégica en tiempo real
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
             <Chip 
-              label={`Área: ${user.area}`}
+              label={`Rol: ${user?.rol || 'SIN ROL'}`}
               variant="outlined"
-              sx={{ fontWeight: 'bold' }}
+              sx={{ fontWeight: 700, bgcolor: '#eff6ff', borderColor: '#bfdbfe', color: '#1e3a8a' }}
             />
-          )}
+            {user?.area && (
+              <Chip 
+                label={`Área: ${user.area}`}
+                variant="outlined"
+                sx={{ fontWeight: 700, bgcolor: '#f8fafc', borderColor: '#cbd5f5', color: '#334155' }}
+              />
+            )}
+          </Stack>
+        </Stack>
+      </Paper>
+
+      {/* SECCIÓN 0: CENTRO OPERATIVO */}
+      <Typography variant="h5" fontWeight="800" sx={{ color: '#0f172a', letterSpacing: '-0.3px' }}>
+        Centro Operativo
+      </Typography>
+      <Paper elevation={0} sx={{ ...panelSx, borderRadius: 4 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.05fr 0.95fr' }, gap: 3 }}>
+          <Box>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" sx={{ mb: 2 }}>
+              <Typography variant="subtitle1" fontWeight="700" sx={{ color: '#b91c1c', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ErrorOutline /> Alertas Críticas Integradas
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                <Chip label={`ALTO ${alertSummary.alto}`} size="small" sx={{ bgcolor: '#fee2e2', color: '#991b1b', fontWeight: 700 }} />
+                <Chip label={`MEDIO ${alertSummary.medio}`} size="small" sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 700 }} />
+                <Chip label={`BAJO ${alertSummary.bajo}`} size="small" sx={{ bgcolor: '#dbeafe', color: '#1e40af', fontWeight: 700 }} />
+              </Stack>
+            </Stack>
+
+            {alertasCriticas.length > 0 ? (
+              <Paper elevation={0} sx={{ p: 2, border: '1px solid #fecaca', bgcolor: '#fff1f2', borderRadius: 3, maxHeight: 360, overflowY: 'auto' }}>
+                {visibleAlertas.map(alerta => (
+                  <AlertaCriticaCard key={alerta.id} alerta={alerta} />
+                ))}
+              </Paper>
+            ) : (
+              <Paper elevation={0} sx={{ p: 2, border: '1px solid #bbf7d0', bgcolor: '#f0fdf4', borderRadius: 3 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#15803d', fontWeight: 600 }}>
+                  <CheckCircle fontSize="small" /> Excelente: No hay avisos críticos en este momento
+                </Typography>
+              </Paper>
+            )}
+
+            {alertasCriticas.length > 5 && (
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                <Button variant="text" onClick={() => setShowAllAlerts((prev) => !prev)}>
+                  {showAllAlerts ? 'Ver menos' : 'Ver más alertas'}
+                </Button>
+              </Box>
+            )}
+          </Box>
+
+          <Box>
+            <Typography variant="subtitle1" fontWeight="700" sx={{ ...sectionTitleSx, mb: 2, color: '#0f172a' }}>
+              <Schedule /> Agenda Operativa Inmediata
+            </Typography>
+            <Stack spacing={1.25} sx={{ mb: 2 }}>
+              {agendaItems.length === 0 ? (
+                <Paper elevation={0} sx={{ p: 2, border: '1px dashed #cbd5f5', borderRadius: 2.5, bgcolor: '#f8fafc' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No hay eventos próximos en el período actual.
+                  </Typography>
+                </Paper>
+              ) : (
+                agendaItems.map((item) => {
+                  const typeLabel = item.tipo === 'tarea' ? 'Tarea' : item.tipo === 'orden' ? 'Orden' : 'Inventario';
+                  const priorityMap = {
+                    alta: { bg: '#fee2e2', color: '#b91c1c' },
+                    media: { bg: '#fef3c7', color: '#92400e' },
+                    baja: { bg: '#dcfce7', color: '#166534' },
+                  };
+                  const priorityStyle = priorityMap[item.prioridad] || priorityMap.media;
+                  const isTask = item.tipo === 'tarea' && Boolean(item.id);
+
+                  return (
+                    <Paper
+                      key={`${item.tipo}-${item.fecha}-${item.titulo}`}
+                      elevation={0}
+                      onClick={() => {
+                        if (isTask) {
+                          setSelectedTaskId(item.id || null);
+                          setTaskModalOpen(true);
+                        }
+                      }}
+                      sx={{
+                        p: 1.5,
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 2.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 2,
+                        cursor: isTask ? 'pointer' : 'default',
+                        transition: 'background-color 160ms ease, box-shadow 160ms ease',
+                        '&:hover': isTask ? { bgcolor: '#f8fafc', boxShadow: '0 8px 18px rgba(15, 23, 42, 0.08)' } : {},
+                      }}
+                    >
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="subtitle2" fontWeight="700" sx={{ color: '#0f172a' }} noWrap>
+                          {item.titulo}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {formatDateSafe(item.fecha)}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={1} flexWrap="wrap">
+                        <Chip label={typeLabel} size="small" sx={{ bgcolor: '#f1f5f9', fontWeight: 700 }} />
+                        <Chip label={item.prioridad.toUpperCase()} size="small" sx={{ bgcolor: priorityStyle.bg, color: priorityStyle.color, fontWeight: 700 }} />
+                      </Stack>
+                    </Paper>
+                  );
+                })
+              )}
+            </Stack>
+            <Divider sx={{ my: 2 }} />
+            <Calendar
+              mes={mesActual}
+              onMonthChange={(newDate) => setMesActual(newDate)}
+              onTaskClick={(taskId) => {
+                setSelectedTaskId(taskId);
+                setTaskModalOpen(true);
+              }}
+              onEventClick={(eventoId) => {
+                setSelectedEventoId(eventoId);
+                setEventoModalOpen(true);
+              }}
+              onCreateEventClick={() => {
+                setEditingEvento(null);
+                setEventoFormOpen(true);
+              }}
+              refreshTrigger={refreshCalendar}
+            />
+          </Box>
         </Box>
-      </Box>
-
-      {/* SECCIÓN 0: ALERTAS CRÍTICAS - Filtradas y personalizadas por rol */}
-      {alertasCriticas.length > 0 && (
-        <>
-          <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ErrorOutline /> Alertas y Avisos del Sistema
-          </Typography>
-          <Paper elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #fee2e2', bgcolor: '#fef2f2', maxHeight: 360, overflowY: 'auto' }}>
-            {visibleAlertas.map(alerta => (
-              <AlertaCriticaCard key={alerta.id} alerta={alerta} />
-            ))}
-          </Paper>
-          {alertasCriticas.length > 5 && (
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 4 }}>
-              <Button variant="text" onClick={() => setShowAllAlerts((prev) => !prev)}>
-                {showAllAlerts ? 'Ver menos' : 'Ver más alertas'}
-              </Button>
-            </Box>
-          )}
-        </>
-      )}
-
-      {/* Aviso personalizado según rol si no hay alertas */}
-      {alertasCriticas.length === 0 && (
-        <Paper elevation={0} sx={{ p: 2, mb: 4, border: '1px solid #d1fae5', bgcolor: '#f0fdf4' }}>
-          <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#16a34a' }}>
-            <CheckCircle fontSize="small" /> Excelente: No hay avisos críticos en este momento
-          </Typography>
-        </Paper>
-      )}
+      </Paper>
 
       {/* SECCIÓN 1: GESTIÓN DOCUMENTAL - Solo para ADMINISTRADOR, RRHH, TRABAJADOR */}
       {canSeeDocs() && (
         <>
-          <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="h6" fontWeight="700" sx={sectionTitleSx}>
             <FolderOpen color="primary" /> Estado Documental
           </Typography>
           
@@ -476,7 +657,7 @@ const Dashboard = () => {
       )}
 
       {/* --- SECCIÓN 2: GESTIÓN OPERATIVA (TAREAS) --- */}
-      <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Typography variant="h6" fontWeight="700" sx={sectionTitleSx}>
         <TaskAlt color="success" /> 
         {canSeeAllTasks() ? 'Estado de Tareas (Todas)' : 'Mis Tareas'}
       </Typography>
@@ -510,7 +691,7 @@ const Dashboard = () => {
       {/* --- SECCIÓN 3: GESTIÓN DE INVENTARIO - Solo para ADMINISTRADOR, RRHH, SUPERVISOR --- */}
       {canSeeInventory() && (
         <>
-          <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="h6" fontWeight="700" sx={sectionTitleSx}>
             <Warehouse color="warning" /> Estado de Inventario
           </Typography>
 
@@ -545,7 +726,7 @@ const Dashboard = () => {
       {/* --- SECCIÓN 4: ÓRDENES DE COMPRA - Solo para ADMINISTRADOR, RRHH, SUPERVISOR --- */}
       {canSeeOrdenes() && (
         <>
-          <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="h6" fontWeight="700" sx={sectionTitleSx}>
             <ShoppingCart color="info" /> Órdenes de Compra
           </Typography>
 
@@ -576,46 +757,21 @@ const Dashboard = () => {
         </>
       )}
 
-      {/* --- SECCIÓN 5: CALENDARIO INTELIGENTE --- */}
-      <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Schedule /> Calendario de Eventos y Tareas
-      </Typography>
-
-      <Box sx={{ mb: 5 }}>
-        <Calendar
-          mes={mesActual}
-          onMonthChange={(newDate) => setMesActual(newDate)}
-          onTaskClick={(taskId) => {
-            setSelectedTaskId(taskId);
-            setTaskModalOpen(true);
-          }}
-          onEventClick={(eventoId) => {
-            setSelectedEventoId(eventoId);
-            setEventoModalOpen(true);
-          }}
-          onCreateEventClick={() => {
-            setEditingEvento(null);
-            setEventoFormOpen(true);
-          }}
-          refreshTrigger={refreshCalendar}
-        />
-      </Box>
-
       {/* --- SECCIÓN 6: ACTIVIDAD RECIENTE --- */}
-      <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, color: '#1e293b' }}>
+      <Typography variant="h6" fontWeight="700" sx={{ ...sectionTitleSx, color: '#0f172a' }}>
         Últimos Movimientos
       </Typography>
       
-      <Paper elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
+      <Paper elevation={0} sx={{ ...subtleCardSx, overflow: 'hidden' }}>
         <List sx={{ p: 0 }}>
           {recentActivity.length === 0 ? (
             <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>No hay actividad reciente.</Box>
           ) : (
             recentActivity.map((item, index) => (
               <Box key={item.id}>
-                <ListItem alignItems="flex-start" sx={{ py: 2 }}>
+                <ListItem alignItems="flex-start" sx={{ py: 2, px: { xs: 2, md: 3 }, transition: 'background-color 160ms ease', '&:hover': { bgcolor: '#f8fafc' } }}>
                   <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: item.type === 'DOCUMENTO' ? '#e0f2fe' : '#f0fdf4', color: item.type === 'DOCUMENTO' ? '#0284c7' : '#16a34a' }}>
+                    <Avatar sx={{ bgcolor: item.type === 'DOCUMENTO' ? '#e0f2fe' : '#f0fdf4', color: item.type === 'DOCUMENTO' ? '#0284c7' : '#16a34a', boxShadow: '0 6px 12px rgba(15, 23, 42, 0.12)' }}>
                       {item.type === 'DOCUMENTO' ? <Description /> : <Assignment />}
                     </Avatar>
                   </ListItemAvatar>
@@ -627,7 +783,7 @@ const Dashboard = () => {
                       </Typography>
                     }
                   />
-                  <Chip label={item.type} size="small" sx={{ fontSize: '0.65rem', fontWeight: 'bold', height: 20 }} />
+                  <Chip label={item.type} size="small" sx={{ fontSize: '0.65rem', fontWeight: 'bold', height: 22, bgcolor: '#f1f5f9' }} />
                 </ListItem>
                 {index < recentActivity.length - 1 && <Divider component="li" />}
               </Box>
@@ -638,12 +794,12 @@ const Dashboard = () => {
 
       {/* FOOTER */}
       <Box sx={{ mt: 8, textAlign: 'center', borderTop: '1px solid #e2e8f0', pt: 3, pb: 5 }}>
-        <Typography variant="body2" color="text.secondary">Sistema SERKAN SPA 2026</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>Sistema SERKAN SPA 2026</Typography>
         
       {/* Información sobre permisos del rol */}
-        <Paper elevation={0} sx={{ p: 2, mt: 3, bgcolor: '#f0f9ff', border: '1px solid #bfdbfe', borderRadius: 1 }}>
-          <Typography variant="caption" fontWeight="bold" color="primary">
-            📋 Información visible para tu rol:
+        <Paper elevation={0} sx={{ ...panelSx, mt: 3, bgcolor: '#eff6ff', border: '1px solid #bfdbfe' }}>
+          <Typography variant="caption" fontWeight="bold" color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}>
+            <InfoOutlined sx={{ fontSize: 14 }} /> Información visible para tu rol
           </Typography>
           <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
             {canSeeDocs() && <Chip label="Documentos" size="small" color="primary" variant="outlined" />}

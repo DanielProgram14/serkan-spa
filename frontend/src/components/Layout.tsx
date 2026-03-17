@@ -1,13 +1,12 @@
-import { Box, Container, CssBaseline, Typography } from '@mui/material';
+import { Box, Container, Typography } from '@mui/material';
 import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 
 const Layout = () => {
   return (
     <Box
-      sx={{  display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f8fafc',}} >
-      <CssBaseline />
-
+      sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}
+    >
       <Navbar />
 
       {/* Contenido principal */}
@@ -25,8 +24,9 @@ const Layout = () => {
         sx={{
           py: 3,
           textAlign: 'center',
-          bgcolor: 'white',
-          borderTop: '1px solid #e2e8f0',
+          bgcolor: 'background.paper',
+          borderTop: '1px solid',
+          borderColor: 'divider',
         }}
       >
         <Container maxWidth="sm">

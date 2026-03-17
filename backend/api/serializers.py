@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from decimal import Decimal
 from uuid import uuid4
@@ -604,6 +605,49 @@ class DocumentoSerializer(serializers.ModelSerializer):
 # 4. SEGURIDAD (Usuarios y Perfiles)
 # ==========================================
 
+class LoginSerializer(serializers.Serializer):
+    login = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    username = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    email = serializers.EmailField(write_only=True, required=False, allow_blank=True)
+    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+
+    def validate(self, attrs):
+        raw_login = (
+            attrs.get("login")
+            or attrs.get("username")
+            or attrs.get("email")
+            or ""
+        ).strip()
+        password = attrs.get("password") or ""
+
+        if not raw_login:
+            raise serializers.ValidationError("Debes ingresar usuario o correo.")
+        if not password:
+            raise serializers.ValidationError("Debes ingresar password.")
+
+        username = raw_login
+        if "@" in raw_login:
+            matches = User.objects.filter(email__iexact=raw_login)
+            if matches.count() > 1:
+                raise serializers.ValidationError(
+                    "El correo esta asociado a multiples cuentas."
+                )
+            if matches.exists():
+                username = matches.first().username
+
+        user = authenticate(
+            request=self.context.get("request"),
+            username=username,
+            password=password,
+        )
+
+        if not user:
+            raise serializers.ValidationError("Credenciales incorrectas.")
+
+        attrs["user"] = user
+        return attrs
+
+
 class PerfilSerializer(serializers.ModelSerializer):
     rol = serializers.SerializerMethodField()
     trabajador_nombre = serializers.SerializerMethodField()
@@ -636,6 +680,27 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'password', 'rol', 'trabajador_id', 'perfil']
+
+    def validate(self, attrs):
+        instance = self.instance
+
+        username = attrs.get("username", getattr(instance, "username", None))
+        if username:
+            qs = User.objects.filter(username__iexact=username)
+            if instance:
+                qs = qs.exclude(pk=instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError({"username": "Este nombre de usuario ya existe."})
+
+        email = attrs.get("email", getattr(instance, "email", None))
+        if email:
+            qs = User.objects.filter(email__iexact=email)
+            if instance:
+                qs = qs.exclude(pk=instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError({"email": "Este correo ya existe."})
+
+        return attrs
 
     def validate_rol(self, value):
         normalized = normalize_role(value)
@@ -686,16 +751,6 @@ class UserSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         rol = validated_data.pop('rol', None)
         rut = validated_data.pop('trabajador_id', None) if 'trabajador_id' in validated_data else None
-
-        if 'username' in validated_data:
-            username_value = validated_data.get('username')
-            if username_value and User.objects.filter(username__iexact=username_value).exclude(pk=instance.pk).exists():
-                raise serializers.ValidationError({"username": "Este nombre de usuario ya existe."})
-
-        if 'email' in validated_data:
-            email_value = validated_data.get('email')
-            if email_value and User.objects.filter(email__iexact=email_value).exclude(pk=instance.pk).exists():
-                raise serializers.ValidationError({"email": "Este correo ya existe."})
 
         instance.username = validated_data.get('username', instance.username)
         instance.email = validated_data.get('email', instance.email)

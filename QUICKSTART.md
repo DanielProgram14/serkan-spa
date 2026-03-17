@@ -75,6 +75,13 @@ python manage.py createsuperuser
 
 Luego accede a: `http://localhost:8000/admin`
 
+Opcional (mas seguro en produccion, evita prompts y crea perfil):
+
+```bash
+cd backend
+python manage.py bootstrap_admin --username admin --email admin@empresa.cl --password "TuPasswordSegura"
+```
+
 ---
 
 ## 🆘 Problemas comunes

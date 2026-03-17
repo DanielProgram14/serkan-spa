@@ -5,12 +5,10 @@ import {
   Typography,
   Button,
   Stack,
-  Chip,
   Card,
   CardContent,
   IconButton,
   Tooltip,
-  Badge,
   Divider,
 } from '@mui/material';
 import {
@@ -166,9 +164,11 @@ const Calendar: React.FC<CalendarComponentProps> = ({
     <Paper
       elevation={2}
       sx={{
-        p: 2,
-        borderRadius: 2,
-        backgroundColor: '#fafafa',
+        p: { xs: 1.5, md: 2 },
+        borderRadius: 3,
+        backgroundColor: '#ffffff',
+        border: '1px solid #e2e8f0',
+        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
       }}
     >
       {/* HEADER CON CONTROLES */}
@@ -180,8 +180,8 @@ const Calendar: React.FC<CalendarComponentProps> = ({
           mb: 2,
         }}
       >
-        <Typography variant="h6" sx={{ fontWeight: 'bold', textTransform: 'capitalize' }}>
-          📅 {monthName}
+        <Typography variant="h6" sx={{ fontWeight: 800, textTransform: 'capitalize', color: '#0f172a', letterSpacing: '-0.2px' }}>
+          {monthName}
         </Typography>
 
         <Stack direction="row" spacing={1}>
@@ -218,6 +218,7 @@ const Calendar: React.FC<CalendarComponentProps> = ({
               color="primary"
               startIcon={<Add />}
               onClick={onCreateEventClick}
+              sx={{ textTransform: 'none', fontWeight: 700 }}
             >
               Evento
             </Button>
@@ -232,8 +233,9 @@ const Calendar: React.FC<CalendarComponentProps> = ({
         sx={{
           mb: 2,
           p: 1,
-          backgroundColor: '#fff',
-          borderRadius: 1,
+          backgroundColor: '#f8fafc',
+          borderRadius: 2,
+          border: '1px solid #e2e8f0',
           flexWrap: 'wrap',
         }}
       >
@@ -264,8 +266,9 @@ const Calendar: React.FC<CalendarComponentProps> = ({
               textAlign: 'center',
               fontWeight: 'bold',
               py: 1,
-              backgroundColor: '#e3f2fd',
-              borderRadius: 1,
+              backgroundColor: '#eef2ff',
+              borderRadius: 1.5,
+              border: '1px solid #e2e8f0',
             }}
           >
             <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
@@ -282,14 +285,14 @@ const Calendar: React.FC<CalendarComponentProps> = ({
             key={idx}
             sx={{
               minHeight: 100,
-              backgroundColor: isCurrentMonth(day.date) ? '#fff' : '#f5f5f5',
-              border: isToday(day.date) ? '2px solid #2196f3' : '1px solid #e0e0e0',
-              borderRadius: 1,
+              backgroundColor: isCurrentMonth(day.date) ? '#ffffff' : '#f8fafc',
+              border: isToday(day.date) ? '2px solid #2563eb' : '1px solid #e2e8f0',
+              borderRadius: 2,
               position: 'relative',
               overflow: 'hidden',
               cursor: day.hasContent ? 'pointer' : 'default',
               transition: 'all 0.2s',
-              '&:hover': day.hasContent ? { boxShadow: 3, backgroundColor: '#f9f9f9' } : {},
+              '&:hover': day.hasContent ? { boxShadow: '0 10px 20px rgba(15, 23, 42, 0.08)', backgroundColor: '#f8fafc' } : {},
             }}
           >
             <CardContent
@@ -330,11 +333,12 @@ const Calendar: React.FC<CalendarComponentProps> = ({
                       px: 0.5,
                       py: 0.25,
                       mb: 0.25,
-                      borderRadius: 0.5,
+                      borderRadius: 1,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       cursor: 'pointer',
+                      fontWeight: 600,
                       '&:hover': {
                         opacity: 0.8,
                         backgroundColor: getEventColor(evento.tipo),
@@ -362,11 +366,12 @@ const Calendar: React.FC<CalendarComponentProps> = ({
                       px: 0.5,
                       py: 0.25,
                       mb: 0.25,
-                      borderRadius: 0.5,
+                      borderRadius: 1,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       cursor: 'pointer',
+                      fontWeight: 600,
                       '&:hover': {
                         opacity: 0.8,
                         backgroundColor: '#b71c1c',
