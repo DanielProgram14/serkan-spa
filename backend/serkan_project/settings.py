@@ -34,7 +34,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'corsheaders',
     'rest_framework',
-    'api',
+    'api.apps.ApiConfig',
 ]
 
 MIDDLEWARE = [
@@ -44,6 +44,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'api.middleware.AuditMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -74,9 +75,9 @@ WSGI_APPLICATION = 'serkan_project.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='serkanSPA-DB'),
-        'USER': config('DB_USER', default='admin-serkan'),
-        'PASSWORD': config('DB_PASSWORD', default='serkan2026'),
+        'NAME': config('DB_NAME', default='serkan-DB'),
+        'USER': config('DB_USER', default='admindb'),
+        'PASSWORD': config('DB_PASSWORD', default='admin123'),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='5432'),
     }
@@ -139,3 +140,8 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
+REST_FRAMEWORK['DEFAULT_PAGINATION_CLASS'] = 'rest_framework.pagination.PageNumberPagination'
+REST_FRAMEWORK['PAGE_SIZE'] = 500
+REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = ['rest_framework.throttling.AnonRateThrottle', 'rest_framework.throttling.UserRateThrottle']
+REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {'anon': '500/day', 'user': '10000/day'}

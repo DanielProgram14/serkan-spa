@@ -97,8 +97,8 @@ const Calendar: React.FC<CalendarComponentProps> = ({
       const dateStr = currentDate.toISOString().split('T')[0];
 
       // Filtrar eventos y tareas para este día
-      const dayEvents = events.filter((e) => e.fecha === dateStr);
-      const dayTasks = tasks.filter((t) => t.fecha_limite === dateStr && t.estado === 'PENDIENTE');
+      const dayEvents = events.filter((e) => e.fecha && e.fecha.split('T')[0] === dateStr);
+      const dayTasks = tasks.filter((t) => t.fecha_limite && t.fecha_limite.split('T')[0] === dateStr && t.estado === 'PENDIENTE' && String(t.prioridad).toUpperCase() === 'ALTA');
 
       days.push({
         date: new Date(currentDate),
@@ -157,6 +157,19 @@ const Calendar: React.FC<CalendarComponentProps> = ({
         return '#f57c00'; // Orange
       default:
         return '#666';
+    }
+  };
+
+  const getTaskColor = (prioridad: string) => {
+    switch (prioridad?.toUpperCase()) {
+      case 'ALTA':
+        return '#d32f2f'; // Red
+      case 'MEDIA':
+        return '#ed6c02'; // Orange
+      case 'BAJA':
+        return '#2e7d32'; // Green
+      default:
+        return '#1976d2'; // Blue
     }
   };
 
@@ -241,19 +254,27 @@ const Calendar: React.FC<CalendarComponentProps> = ({
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Circle sx={{ fontSize: 12, color: '#1976d2' }} />
-          <Typography variant="caption">Sistema</Typography>
+          <Typography variant="caption">Ev. Sistema</Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Circle sx={{ fontSize: 12, color: '#388e3c' }} />
-          <Typography variant="caption">Asignado</Typography>
+          <Typography variant="caption">Ev. Asignado</Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Circle sx={{ fontSize: 12, color: '#f57c00' }} />
-          <Typography variant="caption">Personal</Typography>
+          <Typography variant="caption">Ev. Personal</Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Task sx={{ fontSize: 16, color: '#d32f2f' }} />
-          <Typography variant="caption">Tarea</Typography>
+          <Typography variant="caption">Tarea (Alta)</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Task sx={{ fontSize: 16, color: '#ed6c02' }} />
+          <Typography variant="caption">Tarea (Media)</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Task sx={{ fontSize: 16, color: '#2e7d32' }} />
+          <Typography variant="caption">Tarea (Baja)</Typography>
         </Box>
       </Stack>
 
@@ -361,7 +382,7 @@ const Calendar: React.FC<CalendarComponentProps> = ({
                     }}
                     sx={{
                       fontSize: '0.65rem',
-                      backgroundColor: '#d32f2f',
+                      backgroundColor: getTaskColor(tarea.prioridad),
                       color: 'white',
                       px: 0.5,
                       py: 0.25,
@@ -374,7 +395,7 @@ const Calendar: React.FC<CalendarComponentProps> = ({
                       fontWeight: 600,
                       '&:hover': {
                         opacity: 0.8,
-                        backgroundColor: '#b71c1c',
+                        backgroundColor: getTaskColor(tarea.prioridad),
                       },
                     }}
                     title={tarea.nombre}

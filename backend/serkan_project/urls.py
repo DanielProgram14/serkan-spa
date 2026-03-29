@@ -3,7 +3,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
-from api.views import CustomAuthToken
+from api.views import CustomAuthToken, MiPerfilView
 from api.views import (
     TrabajadorViewSet, 
     DocumentoViewSet, 
@@ -23,7 +23,8 @@ from api.views import (
     TipoDocumentoViewSet,
     CategoriaTareaViewSet, 
     ClienteViewSet,
-    EventoViewSet
+    EventoViewSet,
+    AuditLogViewSet
 )
 
 router = DefaultRouter()
@@ -50,10 +51,12 @@ router.register(r'cargos', CargoViewSet)
 router.register(r'tipos-documento', TipoDocumentoViewSet)
 router.register(r'categorias-tarea', CategoriaTareaViewSet) 
 router.register(r'clientes', ClienteViewSet)                
+router.register(r'audit-logs', AuditLogViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/login/', CustomAuthToken.as_view()),
+    path('api/auth/me/', MiPerfilView.as_view()),
     path('api/', include(router.urls)),
 ]
 

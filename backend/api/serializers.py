@@ -10,7 +10,7 @@ from .models import (
     DocumentoCliente, MovimientoFinancieroCliente,
     CategoriaProducto, Proveedor, Producto, Herramienta,
     OrdenCompra, OrdenCompraItem, MovimientoInventario,
-    HerramientaAsignacion, Evento
+    HerramientaAsignacion, Evento, AuditLog
 )
 from .roles import (
     CANONICAL_ROLE_VALUES,
@@ -611,6 +611,26 @@ class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(write_only=True, required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
 
+    def _resolve_username(self, login_value: str):
+        login_value = login_value.strip()
+        if not login_value:
+            return ""
+
+        qs = User.objects.filter(username__iexact=login_value)
+        if qs.count() > 1:
+            raise serializers.ValidationError("Existe mas de un usuario con ese username.")
+        if qs.exists():
+            return qs.first().username
+
+        if "@" in login_value:
+            email_matches = User.objects.filter(email__iexact=login_value)
+            if email_matches.count() > 1:
+                raise serializers.ValidationError("El correo esta asociado a multiples cuentas.")
+            if email_matches.exists():
+                return email_matches.first().username
+
+        return login_value
+
     def validate(self, attrs):
         raw_login = (
             attrs.get("login")
@@ -618,23 +638,14 @@ class LoginSerializer(serializers.Serializer):
             or attrs.get("email")
             or ""
         ).strip()
-        password = attrs.get("password") or ""
+        password = attrs.get("password")
 
         if not raw_login:
             raise serializers.ValidationError("Debes ingresar usuario o correo.")
-        if not password:
+        if password is None or (isinstance(password, str) and not password.strip()):
             raise serializers.ValidationError("Debes ingresar password.")
 
-        username = raw_login
-        if "@" in raw_login:
-            matches = User.objects.filter(email__iexact=raw_login)
-            if matches.count() > 1:
-                raise serializers.ValidationError(
-                    "El correo esta asociado a multiples cuentas."
-                )
-            if matches.exists():
-                username = matches.first().username
-
+        username = self._resolve_username(raw_login)
         user = authenticate(
             request=self.context.get("request"),
             username=username,
@@ -645,6 +656,7 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Credenciales incorrectas.")
 
         attrs["user"] = user
+        attrs["login_input"] = raw_login
         return attrs
 
 
@@ -834,3 +846,33 @@ class EventoSerializer(serializers.ModelSerializer):
         if trabajadores is not None:
             instance.trabajadores_asignados.set(trabajadores)
         return instance
+
+
+# ==========================================
+# SERIALIZADOR DE AUDITORIA GLOBAL
+# ==========================================
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    user_username = serializers.ReadOnlyField(source='user.username')
+    user_email = serializers.ReadOnlyField(source='user.email')
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id',
+            'timestamp',
+            'user',
+            'user_label',
+            'user_username',
+            'user_email',
+            'action',
+            'module',
+            'model',
+            'object_id',
+            'summary',
+            'changes',
+            'ip_address',
+            'user_agent',
+            'path',
+        ]
+        read_only_fields = fields

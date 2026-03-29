@@ -7,16 +7,34 @@ import {
 import { Add, Visibility, DeleteOutline, Person } from '@mui/icons-material';
 import api from '../../api/axios';
 
+// Definimos los tipos para mejorar la seguridad y legibilidad
+interface Perfil {
+    trabajador_nombre?: string;
+    rol?: string;
+}
+
+interface User {
+    id: number;
+    username: string;
+    perfil?: Perfil;
+}
+
+interface Worker {
+    rut: string;
+    nombres: string;
+    apellidos: string;
+}
+
 const CuentasUsuarios = () => {
-    const [users, setUsers] = useState([]);
-    const [workers, setWorkers] = useState<any[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
+    const [workers, setWorkers] = useState<Worker[]>([]);
     const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false); // Estado para la carga inicial
-    const [isCreating, setIsCreating] = useState(false); // Estado para el botón de crear
+    const [loading, setLoading] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
     
     const [openCreate, setOpenCreate] = useState(false);
     const [openDetail, setOpenDetail] = useState(false);
-    const [selectedUser, setSelectedUser] = useState<any>(null);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
     const [form, setForm] = useState({
         username: '', 
@@ -45,7 +63,6 @@ const CuentasUsuarios = () => {
     useEffect(() => { fetchData(); }, []);
 
     const handleCreate = async () => {
-        // Validación básica antes de enviar
         if (!form.username.includes('@') || form.password.length < 4) {
             alert("Por favor, ingresa un correo válido y una contraseña de al menos 4 caracteres.");
             return;
@@ -54,7 +71,7 @@ const CuentasUsuarios = () => {
         setIsCreating(true);
         try {
             const payload = {
-                username: form.username.trim(), // El correo como ID de acceso
+                username: form.username.trim(),
                 password: form.password,
                 rol: form.role,
                 trabajador_id: form.trabajador_id || null
@@ -86,12 +103,12 @@ const CuentasUsuarios = () => {
         }
     };
 
-    const handleView = (user: any) => {
+    const handleView = (user: User) => {
         setSelectedUser(user);
         setOpenDetail(true);
     };
 
-    const getRoleColor = (rol: string) => {
+    const getRoleColor = (rol?: string): 'primary' | 'secondary' | 'warning' | 'success' | 'default' => {
         switch(rol) {
             case 'ADMINISTRADOR': return 'primary';
             case 'RRHH': return 'secondary';
@@ -129,7 +146,7 @@ const CuentasUsuarios = () => {
                         {loading ? (
                             <TableRow><TableCell colSpan={4} align="center"><CircularProgress size={30} sx={{ my: 2 }} /></TableCell></TableRow>
                         ) : (
-                            users.map((u: any) => (
+                            users.map((u: User) => (
                                 <TableRow key={u.id} hover>
                                     <TableCell sx={{ fontWeight: 'bold' }}>
                                         {u.perfil?.trabajador_nombre?.toUpperCase() || <Chip label="EXTERNO" size="small" variant="outlined" />}
@@ -139,7 +156,7 @@ const CuentasUsuarios = () => {
                                         <Chip 
                                             label={u.perfil?.rol || 'SIN ROL'} 
                                             size="small" 
-                                            color={getRoleColor(u.perfil?.rol) as any} 
+                                            color={getRoleColor(u.perfil?.rol)} 
                                             sx={{ fontWeight: 'bold', fontSize: '0.7rem' }} 
                                         />
                                     </TableCell>
@@ -168,7 +185,7 @@ const CuentasUsuarios = () => {
                                 helperText="El usuario se vinculará a este registro (RUT)"
                             >
                                 <MenuItem value=""><em>-- Usuario sin ficha laboral (Externo) --</em></MenuItem>
-                                {workers.map((w: any) => (
+                                {workers.map((w: Worker) => (
                                     <MenuItem key={w.rut} value={w.rut}>{w.nombres} {w.apellidos} ({w.rut})</MenuItem>
                                 ))}
                             </TextField>
@@ -220,9 +237,9 @@ const CuentasUsuarios = () => {
                             </Avatar>
                             <Typography variant="h6" fontWeight="900">{selectedUser.username}</Typography>
                             <Chip 
-                                label={selectedUser.perfil?.rol} 
+                                label={selectedUser.perfil?.rol || 'SIN ROL'} 
                                 size="small" 
-                                color={getRoleColor(selectedUser.perfil?.rol) as any} 
+                                color={getRoleColor(selectedUser.perfil?.rol)} 
                                 sx={{ mt: 1, fontWeight: 'bold' }} 
                             />
                         </DialogTitle>

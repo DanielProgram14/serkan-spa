@@ -18,7 +18,7 @@ from .models import (
     Proveedor,
     Trabajador,
 )
-from .roles import ROLE_ADMINISTRADOR
+from .roles import ROLE_ADMINISTRADOR, ROLE_TRABAJADOR
 
 
 @override_settings(MEDIA_ROOT=tempfile.gettempdir())
@@ -199,3 +199,48 @@ class InventarioTests(APITestCase):
 
         asignacion = HerramientaAsignacion.objects.get(herramienta=self.herramienta)
         self.assertEqual(asignacion.cantidad, 2)
+
+
+class LoginTests(APITestCase):
+    def setUp(self):
+        self.trabajador = Trabajador.objects.create(
+            rut="33.333.333-3",
+            nombres="Maria",
+            apellidos="Lopez",
+            area="Operaciones",
+            cargo="Operaria",
+            fecha_ingreso="2026-02-01",
+            correo_empresarial="maria@serkan.cl",
+        )
+        self.user = User.objects.create_user(
+            username="maria",
+            email="maria@serkan.cl",
+            password="pass123",
+        )
+        PerfilUsuario.objects.create(
+            user=self.user,
+            rol=ROLE_TRABAJADOR,
+            trabajador=self.trabajador,
+        )
+
+    def test_login_con_correo(self):
+        response = self.client.post(
+            "/api/login/",
+            data={"login": "maria@serkan.cl", "password": "pass123"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("token", response.data)
+        self.assertEqual(response.data["user"]["rol"], "TRABAJADOR")
+        self.assertEqual(response.data["user"]["trabajador_rut"], self.trabajador.rut)
+
+    def test_login_falla_si_trabajador_falta(self):
+        user = User.objects.create_user(username="sin-trabajador", password="pass123")
+        PerfilUsuario.objects.create(user=user, rol=ROLE_TRABAJADOR)
+
+        response = self.client.post(
+            "/api/login/",
+            data={"login": "sin-trabajador", "password": "pass123"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 409)

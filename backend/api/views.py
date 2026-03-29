@@ -9,6 +9,7 @@ from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
+from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -33,6 +34,8 @@ from .models import (
     Tarea,
     TipoDocumento,
     Trabajador,
+    PerfilUsuario,
+    AuditLog,
 )
 from .roles import (
     ROLE_ADMINISTRADOR,
@@ -62,22 +65,29 @@ from .serializers import (
     TipoDocumentoSerializer,
     TrabajadorSerializer,
     UserSerializer,
+    AuditLogSerializer,
 )
 
 
 class RoleContextMixin:
     permission_classes = [IsAuthenticated]
 
+    def _safe_perfil(self, user):
+        try:
+            return user.perfil
+        except PerfilUsuario.DoesNotExist:
+            return None
+
     def get_user_role(self):
         user = self.request.user
         if user.is_superuser:
             return ROLE_ADMINISTRADOR
-        perfil = getattr(user, "perfil", None)
+        perfil = self._safe_perfil(user)
         return normalize_role(getattr(perfil, "rol", None))
 
     def get_user_trabajador(self):
         user = self.request.user
-        perfil = getattr(self.request.user, "perfil", None)
+        perfil = self._safe_perfil(self.request.user)
         trabajador = getattr(perfil, "trabajador", None)
         if trabajador:
             return trabajador
@@ -105,12 +115,26 @@ class CustomAuthToken(ObtainAuthToken):
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    def _get_or_create_perfil(self, user):
+        try:
+            return user.perfil
+        except PerfilUsuario.DoesNotExist:
+            if user.is_superuser:
+                return PerfilUsuario.objects.create(user=user, rol=ROLE_ADMINISTRADOR)
+            return None
+
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
-        perfil = getattr(user, "perfil", None)
+        perfil = self._get_or_create_perfil(user)
         trabajador = getattr(perfil, "trabajador", None)
+
+        if not perfil:
+            return Response(
+                {"detail": "Tu cuenta no tiene perfil asociado. Contacta con el administrador."},
+                status=409,
+            )
 
         if not user.is_active:
             return Response(
@@ -124,8 +148,16 @@ class CustomAuthToken(ObtainAuthToken):
                 status=403,
             )
 
-        token, _ = Token.objects.get_or_create(user=user)
         rol = ROLE_ADMINISTRADOR if user.is_superuser else (normalize_role(getattr(perfil, "rol", None)) or ROLE_TRABAJADOR)
+        if rol in {ROLE_SUPERVISOR, ROLE_TRABAJADOR} and not trabajador:
+            return Response(
+                {"detail": "Tu cuenta requiere un trabajador asociado. Contacta con el administrador."},
+                status=409,
+            )
+
+        token, _ = Token.objects.get_or_create(user=user)
+        user.last_login = timezone.now()
+        user.save(update_fields=["last_login"])
 
         if trabajador:
             nombres = f"{trabajador.nombres} {trabajador.apellidos}".strip()
@@ -140,6 +172,9 @@ class CustomAuthToken(ObtainAuthToken):
             {
                 "token": token.key,
                 "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
                     "rut": rut,
                     "nombres": nombres,
                     "rol": rol,
@@ -255,6 +290,58 @@ class UserViewSet(AdminOnlyViewSet):
         if instance == self.request.user:
             raise PermissionDenied("No puedes eliminar tu propia cuenta.")
         instance.delete()
+
+
+class AuditLogViewSet(AdminOnlyViewSet, viewsets.ReadOnlyModelViewSet):
+    queryset = AuditLog.objects.select_related("user").all().order_by("-timestamp")
+    serializer_class = AuditLogSerializer
+
+    def get_queryset(self):
+        qs = AuditLog.objects.select_related("user").all().order_by("-timestamp")
+        params = self.request.query_params
+
+        action = params.get("action") or params.get("accion")
+        if action:
+            qs = qs.filter(action__iexact=action)
+
+        module = params.get("module") or params.get("modulo")
+        if module:
+            qs = qs.filter(module__icontains=module)
+
+        model = params.get("model") or params.get("modelo")
+        if model:
+            qs = qs.filter(model__icontains=model)
+
+        user_param = params.get("user") or params.get("usuario")
+        if user_param:
+            if user_param.isdigit():
+                qs = qs.filter(user_id=int(user_param))
+            else:
+                qs = qs.filter(
+                    Q(user_label__icontains=user_param)
+                    | Q(user__username__icontains=user_param)
+                    | Q(user__email__icontains=user_param)
+                )
+
+        date_from = params.get("from") or params.get("desde")
+        if date_from:
+            qs = qs.filter(timestamp__date__gte=date_from)
+
+        date_to = params.get("to") or params.get("hasta")
+        if date_to:
+            qs = qs.filter(timestamp__date__lte=date_to)
+
+        search = params.get("q")
+        if search:
+            qs = qs.filter(
+                Q(summary__icontains=search)
+                | Q(module__icontains=search)
+                | Q(model__icontains=search)
+                | Q(object_id__icontains=search)
+                | Q(user_label__icontains=search)
+            )
+
+        return qs
 
 
 class ClienteViewSet(RoleContextMixin, viewsets.ModelViewSet):
@@ -1190,3 +1277,28 @@ class EventoViewSet(RoleContextMixin, viewsets.ModelViewSet):
         queryset = self.get_queryset().filter(tipo=tipo)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+
+class MiPerfilView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        user = request.user
+        email = request.data.get('email')
+        password = request.data.get('password')
+
+        updated = False
+        if email is not None:
+            user.email = email
+            user.username = email  # En Serkan SPA, el username ES el correo
+            updated = True
+        
+        if password:
+            user.set_password(password)
+            updated = True
+            
+        if updated:
+            user.save()
+            return Response({'detail': 'Perfil actualizado correctamente.', 'email': user.email})
+        
+        return Response({'detail': 'No se enviaron cambios.', 'email': user.email}, status=400)

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
-  Box, Typography, Paper, Button, Chip, Stack, Dialog, 
+  Box, Typography, Paper, Button, Chip, Stack, Dialog, Alert,
   DialogTitle, DialogContent, TextField, DialogActions, Tooltip 
 } from '@mui/material';
 import { Add, Delete } from '@mui/icons-material';
@@ -12,42 +12,50 @@ interface MasterItem {
   nombre: string;
 }
 
-// NUEVO TIPO DEFINIDO PARA EVITAR ERRORES DE TYPESCRIPT
 type MasterType = 'AREA' | 'CARGO' | 'DOC' | 'CATEGORIA';
 
+// Objeto para centralizar la gestión de endpoints
+const masterEndpoints: Record<MasterType, string> = {
+  'AREA': '/areas/',
+  'CARGO': '/cargos/',
+  'DOC': '/tipos-documento/',
+  'CATEGORIA': '/categorias-tarea/',
+};
+
 const TablasMaestras = () => {
-  // Estados para las 4 listas
   const [areas, setAreas] = useState<MasterItem[]>([]);
   const [cargos, setCargos] = useState<MasterItem[]>([]);
   const [docs, setDocs] = useState<MasterItem[]>([]);
   const [categorias, setCategorias] = useState<MasterItem[]>([]);
   
-  // Estado del Modal (Sirve para Crear y Editar)
   const [openModal, setOpenModal] = useState(false);
   const [currentType, setCurrentType] = useState<MasterType>('AREA');
   const [editItem, setEditItem] = useState<MasterItem | null>(null); 
   const [itemName, setItemName] = useState('');
+  const [error, setError] = useState('');
   
 
-  // --- 1. CARGA DE DATOS ---
   const fetchData = async () => {
+    setError('');
     try {
         const [rAreas, rCargos, rDocs, rCategorias] = await Promise.all([
-            api.get('/areas/'), 
-            api.get('/cargos/'), 
-            api.get('/tipos-documento/'),
-            api.get('/categorias-tarea/')
+            api.get(masterEndpoints['AREA']), 
+            api.get(masterEndpoints['CARGO']), 
+            api.get(masterEndpoints['DOC']),
+            api.get(masterEndpoints['CATEGORIA'])
         ]);
         setAreas(rAreas.data); 
         setCargos(rCargos.data); 
         setDocs(rDocs.data);
         setCategorias(rCategorias.data);
-    } catch (e) { console.error("Error cargando maestros", e); }
+    } catch (e) { 
+        console.error("Error cargando maestros", e);
+        setError("No se pudieron cargar los datos maestros. Intente de nuevo.");
+    }
   };
 
   useEffect(() => { fetchData(); }, []);
 
-  // --- 2. ABRIR MODAL (CREAR O EDITAR) ---
   const handleOpen = (type: MasterType, item?: MasterItem) => {
       setCurrentType(type);
       if (item) {
@@ -60,13 +68,9 @@ const TablasMaestras = () => {
       setOpenModal(true);
   };
 
-  // --- 3. GUARDAR (POST o PUT) ---
   const handleSave = async () => {
-      let endpoint = '';
-      if (currentType === 'AREA') endpoint = '/areas/';
-      if (currentType === 'CARGO') endpoint = '/cargos/';
-      if (currentType === 'DOC') endpoint = '/tipos-documento/';
-      if (currentType === 'CATEGORIA') endpoint = '/categorias-tarea/';
+      const endpoint = masterEndpoints[currentType];
+      if (!endpoint) return;
 
       try {
           if (editItem) {
@@ -76,19 +80,15 @@ const TablasMaestras = () => {
           }
           setOpenModal(false); 
           setItemName('');
-          fetchData(); // Recargar todo
+          fetchData(); 
       } catch (e) { alert("Error al guardar. Verifica que no esté duplicado."); }
   };
 
-  // --- 4. ELIMINAR (DELETE) ---
   const handleDelete = async (type: MasterType, id: number) => {
       if(!confirm("¿Estás seguro de eliminar este registro?")) return;
 
-      let endpoint = '';
-      if (type === 'AREA') endpoint = `/areas/${id}/`;
-      if (type === 'CARGO') endpoint = `/cargos/${id}/`;
-      if (type === 'DOC') endpoint = `/tipos-documento/${id}/`;
-      if (type === 'CATEGORIA') endpoint = `/categorias-tarea/${id}/`; // <--- AÑADIDO
+      const endpoint = `${masterEndpoints[type]}${id}/`;
+      if (!endpoint) return;
 
       try {
           await api.delete(endpoint);
@@ -96,7 +96,6 @@ const TablasMaestras = () => {
       } catch (e) { alert("No se puede eliminar. Probablemente esté en uso por otro registro en el sistema."); }
   };
 
-  // --- COMPONENTE VISUAL DE TARJETA ---
   const MasterCard = ({ title, items, type }: { title: string, items: MasterItem[], type: MasterType }) => (
       <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 4, height: '100%', minHeight: 180, bgcolor: '#fff' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, alignItems: 'center' }}>
@@ -145,6 +144,8 @@ const TablasMaestras = () => {
             Gestión de catálogos para listas desplegables del sistema.
         </Typography>
         
+        {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+
         <Stack spacing={3}>
             {/* FILA 1: Áreas y Cargos */}
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
@@ -156,7 +157,7 @@ const TablasMaestras = () => {
                 </Box>
             </Stack>
 
-            {/* FILA 2: Documentos y Categorías (AHORA RENDERIZADO) */}
+            {/* FILA 2: Documentos y Categorías */}
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
                 <Box sx={{ flex: 1 }}>
                     <MasterCard title="Tipos de Documento" items={docs} type="DOC" />

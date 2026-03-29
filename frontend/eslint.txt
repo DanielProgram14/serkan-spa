@@ -1,0 +1,7 @@
+﻿
+C:\Users\danip\Desktop\Serkan SPA\frontend\src\pages\Dashboard.tsx
+  113:10  error  'eventosCalendario' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  390:64  error  Unexpected any. Specify a different type                @typescript-eslint/no-explicit-any
+
+Ô£û 2 problems (2 errors, 0 warnings)
+

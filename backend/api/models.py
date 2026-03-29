@@ -515,3 +515,49 @@ class Evento(models.Model):
     
     def __str__(self):
         return f"{self.titulo} ({self.tipo}) - {self.fecha}"
+
+
+# --- 5. MODULO DE AUDITORIA GLOBAL ---
+
+class AuditLog(models.Model):
+    ACTION_CREATE = 'CREATE'
+    ACTION_UPDATE = 'UPDATE'
+    ACTION_DELETE = 'DELETE'
+    ACTION_CHOICES = [
+        (ACTION_CREATE, 'Creacion'),
+        (ACTION_UPDATE, 'Modificacion'),
+        (ACTION_DELETE, 'Eliminacion'),
+    ]
+
+    timestamp = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audit_logs',
+    )
+    user_label = models.CharField(max_length=150, blank=True)
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    module = models.CharField(max_length=100, blank=True)
+    model = models.CharField(max_length=100)
+    object_id = models.CharField(max_length=100, blank=True)
+    summary = models.TextField(blank=True)
+    changes = models.JSONField(default=dict, blank=True)
+    ip_address = models.CharField(max_length=45, blank=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+    path = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['timestamp']),
+            models.Index(fields=['action']),
+            models.Index(fields=['module']),
+            models.Index(fields=['model']),
+            models.Index(fields=['user']),
+        ]
+
+    def __str__(self):
+        who = self.user_label or (self.user.username if self.user else 'Sistema')
+        return f"{self.action} {self.model} {self.object_id} - {who}"

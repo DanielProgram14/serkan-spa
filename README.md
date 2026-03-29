@@ -180,6 +180,58 @@ El cliente estará disponible en: `http://localhost:5173`
 
 Accede a `http://localhost:8000/admin` con las credenciales del superusuario creado.
 
+## 🏭 Ejecución en producción (resumen)
+
+La guía completa está en `DEPLOYMENT.md`. Aquí va un flujo mínimo y seguro.
+
+### 1. Variables de entorno
+
+Configura `backend/.env` con valores reales:
+
+```env
+DEBUG=False
+ALLOWED_HOSTS=tudominio.com,www.tudominio.com
+CORS_ALLOWED_ORIGINS=https://tudominio.com,https://www.tudominio.com
+CSRF_TRUSTED_ORIGINS=https://tudominio.com,https://www.tudominio.com
+```
+
+### 2. Backend (Django)
+
+```bash
+cd backend
+python -m venv venv
+# En Windows:
+venv\Scripts\activate
+# En Linux/Mac:
+source venv/bin/activate
+pip install -r requirements.txt
+pip install gunicorn
+python manage.py migrate --noinput
+python manage.py check --deploy
+```
+
+Si vas a servir estáticos con Django/Nginx, asegúrate de tener `STATIC_ROOT` definido en `backend/serkan_project/settings.py` (por ejemplo `BASE_DIR / 'staticfiles'`) y luego:
+
+```bash
+python manage.py collectstatic --noinput
+```
+
+Arranque de la app:
+
+```bash
+gunicorn serkan_project.wsgi:application --bind 0.0.0.0:8000 --workers 4
+```
+
+### 3. Frontend (React)
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+Sirve `frontend/dist` con Nginx/Apache o un servicio de hosting estático y apunta `/api` al backend.
+
 ## 📁 Estructura del proyecto
 
 ```
@@ -345,6 +397,6 @@ Para consultas o reportar problemas, abre un issue en el repositorio o contacta 
 
 ---
 
-**Última actualización**: 11 de marzo de 2026
+**Última actualización**: 17 de marzo de 2026
 
 **Versión**: 1.0.0

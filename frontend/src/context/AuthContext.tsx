@@ -4,6 +4,9 @@ import type { ReactNode } from 'react';
 export type Rol = 'ADMINISTRADOR' | 'RRHH' | 'SUPERVISOR' | 'TRABAJADOR';
 
 interface User {
+  id?: number;
+  username?: string;
+  email?: string;
   rut: string;
   nombres: string;
   rol: Rol;

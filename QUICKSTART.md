@@ -84,6 +84,23 @@ python manage.py bootstrap_admin --username admin --email admin@empresa.cl --pas
 
 ---
 
+## 🧹 Limpieza de Login (si hay errores de perfiles o tokens)
+
+Si el login falla por perfiles faltantes o roles inconsistentes:
+
+```bash
+cd backend
+python manage.py cleanup_login_data --fix
+```
+
+Si quieres reiniciar tokens (se regeneran en el próximo login):
+
+```bash
+python manage.py cleanup_login_data --reset-tokens
+```
+
+---
+
 ## 🆘 Problemas comunes
 
 | Problema | Solución |

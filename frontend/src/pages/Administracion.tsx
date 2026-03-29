@@ -3,6 +3,7 @@ import { Box, Paper, List, ListItemButton, ListItemIcon, ListItemText, Typograph
 import { Person, TableChart, Visibility } from '@mui/icons-material';
 import CuentasUsuarios from './admin/CuentasUsuarios';
 import TablasMaestras from './admin/TablasMaestras';
+import AuditoriaGlobal from './admin/AuditoriaGlobal';
 
 const Administracion = () => {
     const [tab, setTab] = useState(0);
@@ -37,11 +38,7 @@ const Administracion = () => {
             <Box sx={{ flex: 1 }}>
                 {tab === 0 && <CuentasUsuarios />}
                 {tab === 1 && <TablasMaestras />}
-                {tab === 2 && (
-                    <Paper sx={{ p: 5, textAlign: 'center', borderRadius: 4 }}>
-                        <Typography variant="h6" color="text.secondary">Módulo de Auditoría en construcción...</Typography>
-                    </Paper>
-                )}
+                {tab === 2 && <AuditoriaGlobal />}
             </Box>
         </Box>
     );
