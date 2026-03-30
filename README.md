@@ -114,9 +114,16 @@ python manage.py migrate
 
 ### 6. Crear superusuario (administrador)
 
+**Opción A: Modo interactivo (Por defecto de Django)**
 ```bash
 python manage.py createsuperuser
 ```
+
+**Opción B: Creación automática (Comando personalizado recomendado)**
+```bash
+python manage.py bootstrap_admin --force --username admin --email admini@serkan.cl --password "admin123456"
+```
+*Nota: Este comando crea o actualiza directamente un superusuario con las credenciales indicadas, ideal para inicializar el proyecto rápidamente.*
 
 ### 7. Instalar dependencias del frontend
 
