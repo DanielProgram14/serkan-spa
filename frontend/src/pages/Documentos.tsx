@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
+import { showSuccess, showError, showWarning, confirmAction } from '../utils/alerts';
 
 // --- Interfaces ---
 interface Trabajador {
@@ -114,7 +115,7 @@ const Documentos = () => {
     if (!canManageDocuments) return;
 
     if (!form.trabajador || !form.archivo || !form.tipo) {
-      alert("Faltan datos obligatorios (Trabajador, Tipo o Archivo).");
+      showWarning("Faltan datos obligatorios", "Debes seleccionar un trabajador, un tipo de documento y adjuntar un archivo.");
       return;
     }
 
@@ -128,19 +129,22 @@ const Documentos = () => {
 
     try {
       await api.post('/documentos/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      showSuccess('Documento subido correctamente');
       fetchData();
       setOpen(false);
       setForm({ ...form, archivo: null, observacion: '', tipo: '' });
-    } catch (err) { alert("Error al subir."); }
+    } catch (err) { showError('Error', "No se pudo subir el documento."); }
   };
 
 const handleDelete = async (id: number) => {
     if (!canManageDocuments) return;
-    if(!confirm("¿Estás seguro de eliminar este documento de forma permanente?")) return;
+    const isConfirmed = await confirmAction('¿Eliminar documento?', '¿Estás seguro de eliminar este documento de forma permanente?', 'Sí, eliminar');
+    if(!isConfirmed) return;
     try {
         await api.delete(`/documentos/${id}/`);
+        showSuccess('Documento eliminado');
         fetchData();
-    } catch(e) { alert("Error al eliminar el documento."); }
+    } catch(e) { showError("Error", "No se pudo eliminar el documento."); }
   };
 
   const getEstado = (fechaVencimiento: string | null) => {

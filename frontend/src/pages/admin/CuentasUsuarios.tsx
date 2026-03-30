@@ -8,6 +8,7 @@ import {
 } from '@mui/material';
 import { Add, Visibility, DeleteOutline, Person } from '@mui/icons-material';
 import api from '../../api/axios';
+import { showSuccess, showError, showWarning, confirmAction } from '../../utils/alerts';
 
 // Definimos los tipos para mejorar la seguridad y legibilidad
 interface Perfil {
@@ -68,7 +69,7 @@ const CuentasUsuarios = () => {
 
     const handleCreate = async () => {
         if (!form.username.includes('@') || form.password.length < 4) {
-            alert("Por favor, ingresa un correo válido y una contraseña de al menos 4 caracteres.");
+            showWarning("Datos inválidos", "Por favor, ingresa un correo válido y una contraseña de al menos 4 caracteres.");
             return;
         }
 
@@ -86,23 +87,25 @@ const CuentasUsuarios = () => {
             setOpenCreate(false);
             setForm({ username: '', password: '', role: 'TRABAJADOR', trabajador_id: '' });
             fetchData();
-            alert("¡Acceso creado con éxito!");
+            showSuccess("¡Acceso creado con éxito!");
         } catch (e: any) { 
             console.error(e);
             const errorMsg = e.response?.data?.username ? "Este correo ya está registrado." : "Error al crear el acceso.";
-            alert(errorMsg);
+            showError("No se pudo crear", errorMsg);
         } finally {
             setIsCreating(false);
         }
     };
 
     const handleDelete = async (userId: number, username: string) => {
-        if (window.confirm(`⚠️ ¿Eliminar el acceso para ${username}?`)) {
+        const isConfirmed = await confirmAction('¿Eliminar acceso?', `⚠️ ¿Eliminar el acceso para ${username}?`, 'Sí, eliminar');
+        if (isConfirmed) {
             try {
                 await api.delete(`/users/${userId}/`);
+                showSuccess("Usuario eliminado");
                 fetchData();
             } catch (e) {
-                alert("No se pudo eliminar el usuario.");
+                showError("Error", "No se pudo eliminar el usuario.");
             }
         }
     };

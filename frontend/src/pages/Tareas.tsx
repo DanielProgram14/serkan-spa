@@ -16,6 +16,7 @@ import {
 import CheckCircle from '@mui/icons-material/CheckCircle';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
+import { showSuccess, showError, showWarning, confirmAction } from '../utils/alerts';
 
 // --- INTERFACES ---
 interface Tarea {
@@ -219,7 +220,7 @@ const Tareas = () => {
     if (!canCreateTask) return;
 
     if (!form.nombre || !form.responsable || !form.fecha_limite) {
-      alert("Faltan campos obligatorios."); return;
+      showWarning("Faltan campos obligatorios", "Por favor completa todos los campos requeridos (*)."); return;
     }
     let finalCategoria = form.categoria ? parseInt(form.categoria) : null;
     let finalCliente = form.cliente || null;
@@ -250,15 +251,24 @@ const Tareas = () => {
 
 const handleDelete = async (id: number) => {
     if (!canDeleteTask) return;
-    if(!confirm("¿Eliminar tarea y subtareas?")) return;
-    try { await api.delete(`/tareas/${id}/`); fetchData(); } catch (err) { alert("Error."); }
+    const isConfirmed = await confirmAction('¿Eliminar tarea?', 'Se eliminará la tarea y todas sus subtareas.\\nEsta acción no se puede deshacer.', 'Sí, eliminar');
+    if(!isConfirmed) return;
+    try { 
+      await api.delete(`/tareas/${id}/`); 
+      showSuccess('Tarea eliminada');
+      fetchData(); 
+    } catch (err) { 
+      showError('Error al eliminar', 'No se pudo eliminar la tarea.'); 
+    }
   };
 
 const handleQuickComplete = async (task: Tarea) => {
     if (!canCompleteTask) return;
-    if(!confirm(`¿Marcar "${task.nombre}" como COMPLETADA?`)) return;
+    const isConfirmed = await confirmAction('¿Completar tarea?', `¿Marcar "${task.nombre}" como COMPLETADA?`, 'Sí, completar');
+    if(!isConfirmed) return;
     try { 
       await api.patch(`/tareas/${task.id}/`, { estado: 'COMPLETADA' }); 
+      showSuccess('Tarea completada');
       fetchData();
       setErrorMessage(null);
     } catch (err: any) { 

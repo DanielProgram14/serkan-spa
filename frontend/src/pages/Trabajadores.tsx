@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   Box, Typography, Button, Chip, IconButton, Tooltip, Dialog, 
   DialogContent, DialogActions, TextField, MenuItem, Stack, Paper, Avatar, 
@@ -12,8 +12,9 @@ import {
   Add, Search, EditOutlined, DeleteOutline, VisibilityOutlined, 
   Close, Description, Download, History, CalendarToday, Person
 } from '@mui/icons-material';
-import api from '../api/axios'; 
+import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
+import { showSuccess, showError, showWarning, confirmAction } from '../utils/alerts';
 
 // --- INTERFACES ---
 export interface Trabajador {
@@ -91,6 +92,7 @@ const Trabajadores = () => {
   const [formData, setFormData] = useState<Trabajador>(initialFormState);
   const [selectedWorker, setSelectedWorker] = useState<Trabajador | null>(null);
   const [workerDocs, setWorkerDocs] = useState<any[]>([]);
+  const [workerHistory, setWorkerHistory] = useState<any[]>([]);
 
   // --- 1. CARGA DE DATOS (TRABAJADORES + MAESTROS) ---
   const fetchData = async () => {
@@ -121,12 +123,21 @@ const Trabajadores = () => {
   // --- HANDLERS ---
   const handleOpenCreate = () => { setFormData(initialFormState); setOpenCreate(true); };
   
-  const handleOpenEdit = (worker: Trabajador) => { setFormData(worker); setOpenEdit(true); };
+  const handleOpenEdit = (worker: Trabajador) => { 
+    setFormData({
+      ...worker,
+      correo_personal: worker.correo_personal || '',
+      correo_empresarial: worker.correo_empresarial || '',
+      telefono: worker.telefono || ''
+    }); 
+    setOpenEdit(true); 
+  };
   
   const handleOpenView = async (worker: Trabajador) => { 
       setSelectedWorker(worker); 
       setOpenView(true); 
       setWorkerDocs([]);
+      setWorkerHistory([]);
       if (!canViewWorkerDocuments) return;
 
       try {
@@ -134,6 +145,11 @@ const Trabajadores = () => {
           const docsDelTrabajador = res.data.filter((d: any) => d.trabajador === worker.rut);
           setWorkerDocs(docsDelTrabajador);
       } catch (error) { console.error(error); }
+
+      try {
+          const resHist = await api.get(`/trabajadores/${worker.rut}/historial/`);
+          setWorkerHistory(resHist.data);
+      } catch (error) { console.error("Error cargando historial:", error); }
   };
 
   const handleClose = () => { setOpenCreate(false); setOpenEdit(false); setOpenView(false); };
@@ -148,24 +164,27 @@ const Trabajadores = () => {
         await api.post('/trabajadores/', formData);
       }
       fetchData(); // Recargamos para ver cambios
+      showSuccess('Trabajador guardado con éxito');
       handleClose();
     } catch (err: any) {
-      alert(getApiErrorMessage(err, "Error al guardar el trabajador."));
+      showError('Error al guardar', getApiErrorMessage(err, "Error al guardar el trabajador."));
     }
   };
 
 const handleDelete = async (worker: Trabajador) => {
     if (!canManageWorkers) return;
     if (worker.estado === "ACTIVO") {
-      alert(`❌ No se puede eliminar\n\nEl trabajador "${worker.nombres} ${worker.apellidos}" se encuentra ACTIVO en el sistema.\n\nPara eliminarlo, primero debes cambiar su estado a INACTIVO desde el formulario de edición.`);
+      showWarning('No se puede eliminar', `El trabajador "${worker.nombres} ${worker.apellidos}" se encuentra ACTIVO.\\n\\nCámbialo a INACTIVO desde la edición.`);
       return;
     }
-    if (!confirm(`⚠️ Confirmación de eliminación\n\n¿Estás seguro de que deseas ELIMINAR permanentemente a "${worker.nombres} ${worker.apellidos}"?\n\nEsta acción no se puede deshacer.`)) return;
+    const isConfirmed = await confirmAction('Eliminar Trabajador', `¿Eliminar permanentemente a "${worker.nombres} ${worker.apellidos}"?\\nEsta acción no se puede deshacer.`, 'Sí, eliminar');
+    if (!isConfirmed) return;
     try {
       await api.delete(`/trabajadores/${worker.rut}/`);
+      showSuccess('Trabajador eliminado');
       fetchData();
     } catch (err: any) {
-        alert(getApiErrorMessage(err, "No se pudo eliminar el trabajador."));
+        showError('No se pudo eliminar', getApiErrorMessage(err, "No se pudo eliminar el trabajador."));
     }
   };
 
@@ -422,7 +441,7 @@ const columns: GridColDef[] = [
 
               <Box sx={{ flex: 1 }}>
                 <Typography variant="caption" fontWeight="bold">FECHA INGRESO*</Typography>
-                <TextField type="date" fullWidth value={formData.fecha_ingreso} onChange={(e) => setFormData({...formData, fecha_ingreso: e.target.value})} />
+                <TextField type="date" fullWidth value={formData.fecha_ingreso} disabled={openEdit} onChange={(e) => setFormData({...formData, fecha_ingreso: e.target.value})} />
               </Box>
             </Box>
 
@@ -494,13 +513,16 @@ const columns: GridColDef[] = [
           <DialogContent sx={{ p: 4 }}>
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={4}>
               <Box sx={{ flex: 2 }}>
-                <Typography variant="overline" fontWeight="bold" color="text.secondary" sx={{ letterSpacing: 1.2 }}>INFORMACIÓN</Typography>
+                <Typography variant="overline" fontWeight="bold" color="text.secondary" sx={{ letterSpacing: 1.2 }}>INFORMACIÓN PERSONAL Y DE CONTACTO</Typography>
                 <Divider sx={{ my: 2 }} />
-                <Stack direction="row" spacing={4} sx={{ mb: 4 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 4 }}>
                     <Box><Typography variant="caption" color="text.secondary">CARGO</Typography><Typography variant="subtitle2" fontWeight="bold">{selectedWorker.cargo}</Typography></Box>
                     <Box><Typography variant="caption" color="text.secondary">ÁREA</Typography><Typography variant="subtitle2" fontWeight="bold">{selectedWorker.area}</Typography></Box>
-                    <Box><Typography variant="caption" color="text.secondary">CONTACTO</Typography><Typography variant="subtitle2" fontWeight="bold">{selectedWorker.telefono || '-'}</Typography></Box>
-                </Stack>
+                    <Box><Typography variant="caption" color="text.secondary">TELÉFONO</Typography><Typography variant="subtitle2" fontWeight="bold">{selectedWorker.telefono || '-'}</Typography></Box>
+                    <Box><Typography variant="caption" color="text.secondary">ESTADO</Typography><Typography variant="subtitle2" fontWeight="bold">{selectedWorker.estado}</Typography></Box>
+                    <Box><Typography variant="caption" color="text.secondary">CORREO PERSONAL</Typography><Typography variant="subtitle2" fontWeight="bold" sx={{ wordBreak: 'break-all' }}>{selectedWorker.correo_personal || '-'}</Typography></Box>
+                    <Box><Typography variant="caption" color="text.secondary">CORREO CORPORATIVO</Typography><Typography variant="subtitle2" fontWeight="bold" sx={{ wordBreak: 'break-all' }}>{selectedWorker.correo_empresarial || '-'}</Typography></Box>
+                </Box>
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                   <Typography variant="overline" fontWeight="bold" color="text.secondary" sx={{ letterSpacing: 1.2 }}>DOCUMENTACIÓN ASOCIADA</Typography>
@@ -530,17 +552,30 @@ const columns: GridColDef[] = [
               </Box>
 
               <Box sx={{ flex: 1 }}>
-                <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, height: '100%', bgcolor: '#fafafa' }}>
+                <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, height: '100%', maxHeight: {xs: 400, md: 600}, overflowY: 'auto', bgcolor: '#fafafa' }}>
                   <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
                     <History fontSize="small" /> HISTORIAL
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                      <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#3b82f6' }} />
-                      <Box>
-                         <Typography variant="caption" fontWeight="bold" sx={{ display: 'block' }}>REGISTRO ACTIVO</Typography>
-                         <Typography variant="caption" color="text.secondary">Ficha creada en sistema.</Typography>
+                  <Stack spacing={3}>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Box sx={{ mt: 0.5, width: 10, height: 10, borderRadius: '50%', flexShrink: 0, bgcolor: '#3b82f6' }} />
+                        <Box>
+                           <Typography variant="caption" fontWeight="bold" sx={{ display: 'block' }}>REGISTRO ACTIVO</Typography>
+                           <Typography variant="caption" color="text.secondary">Ficha creada en sistema.</Typography>
+                        </Box>
+                    </Box>
+                    {workerHistory.map((item, idx) => (
+                      <Box key={idx} sx={{ display: 'flex', gap: 2 }}>
+                          <Box sx={{ mt: 0.5, width: 10, height: 10, borderRadius: '50%', flexShrink: 0, bgcolor: item.tipo === 'SISTEMA' ? '#8b5cf6' : item.tipo === 'TAREA' ? '#eab308' : item.tipo === 'HERRAMIENTA' ? '#f97316' : '#10b981' }} />
+                          <Box>
+                             <Typography variant="caption" fontWeight="bold" sx={{ display: 'block' }}>{item.titulo} ({item.tipo})</Typography>
+                             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>{new Date(item.fecha).toLocaleString()}</Typography>
+                             <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{item.descripcion}</Typography>
+                             <Typography variant="caption" sx={{ color: '#64748b', fontStyle: 'italic', display: 'block' }}>Por: {item.usuario}</Typography>
+                          </Box>
                       </Box>
-                  </Box>
+                    ))}
+                  </Stack>
                 </Paper>
               </Box>
             </Stack>

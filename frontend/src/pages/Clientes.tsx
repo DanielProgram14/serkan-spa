@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -17,12 +17,22 @@ import {
   Typography,
   useMediaQuery,
   useTheme,
+  Drawer,
+  Tabs,
+  Tab,
+  Avatar,
+  Divider,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
-import { Add, Close, CloudUpload, DeleteOutline, Download, EditOutlined, Search, VisibilityOutlined } from '@mui/icons-material';
+import { 
+  Add, Close, CloudUpload, DeleteOutline, Download, EditOutlined, 
+  Search, VisibilityOutlined, TrendingUp, TrendingDown,
+  MonetizationOn, Business, ContactPhone, Assessment, Assignment, Folder
+} from '@mui/icons-material';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
+import { showSuccess, showError, showWarning, confirmAction } from '../utils/alerts';
 
 interface Cliente {
   rut: string;
@@ -122,6 +132,32 @@ const formatApiError = (error: unknown) => {
   return 'No se pudo guardar el cliente.';
 };
 
+// Panel Auxiliar para Tabs
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+function CustomTabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+      style={{ height: '100%', overflowY: 'auto' }}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
 const Clientes = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -143,11 +179,12 @@ const Clientes = () => {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [searchText, setSearchText] = useState('');
 
+  // Modals & Drawer state
   const [openCliente, setOpenCliente] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
-  const [openDoc, setOpenDoc] = useState(false);
-  const [openFicha, setOpenFicha] = useState(false);
-  const [fichaCliente, setFichaCliente] = useState<Cliente | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [tabIndex, setTabIndex] = useState(0);
+
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const [clienteForm, setClienteForm] = useState<Cliente>({
@@ -158,6 +195,7 @@ const Clientes = () => {
     correo: '',
     descripcion: '',
   });
+  
   const [docForm, setDocForm] = useState({ archivo: null as File | null, descripcion: '' });
   const [movForm, setMovForm] = useState({
     tipo_movimiento: 'INGRESO' as 'INGRESO' | 'COSTO',
@@ -170,13 +208,7 @@ const Clientes = () => {
     setLoadingClientes(true);
     try {
       const res = await api.get('/clientes/');
-      const data: Cliente[] = res.data ?? [];
-      setClientes(data);
-      setSelected((prev) => {
-        if (!data.length) return null;
-        if (!prev) return data[0];
-        return data.find((x) => x.rut === prev.rut) ?? data[0];
-      });
+      setClientes(res.data ?? []);
     } finally {
       setLoadingClientes(false);
     }
@@ -220,15 +252,23 @@ const Clientes = () => {
     void fetchClientes();
   }, [fetchClientes]);
 
-  useEffect(() => {
-    if (!selected) {
-      setDocs([]);
-      setMovs([]);
-      setResumen(null);
-      return;
-    }
-    void fetchDetail(selected.rut);
-  }, [fetchDetail, selected?.rut]);
+  const handleOpenDrawer = (c: Cliente) => {
+    setSelected(c);
+    setDrawerOpen(true);
+    setTabIndex(0);
+    void fetchDetail(c.rut);
+  };
+
+  const handleCloseDrawer = () => {
+    setDrawerOpen(false);
+    // Don't clear selected immediately so exit animation works smoothly
+    setTimeout(() => {
+        setSelected(null);
+        setDocs([]);
+        setMovs([]);
+        setResumen(null);
+    }, 300);
+  };
 
   const handleOpenCreate = () => {
     if (!canManageClientes) return;
@@ -246,25 +286,25 @@ const Clientes = () => {
     setOpenCliente(true);
   };
 
-  const handleOpenFicha = (c: Cliente) => {
-    setFichaCliente(c);
-    setOpenFicha(true);
-    void fetchDetail(c.rut);
-  };
-
   const handleSaveCliente = async () => {
     if (!canManageClientes) return;
     setSaveError(null);
     const payload = normalizeClientePayload(clienteForm);
     if (!payload.rut || !payload.nombre || !payload.razon_social) {
-      alert('RUT, Nombre y Razon Social son obligatorios.');
+      showWarning('Campos obligatorios', 'RUT, Nombre y Razón Social son obligatorios.');
       return;
     }
     try {
       if (isEdit) await api.put(`/clientes/${payload.rut}/`, payload);
       else await api.post('/clientes/', payload);
       await fetchClientes();
+      showSuccess(isEdit ? 'Cliente actualizado' : 'Cliente creado');
       setOpenCliente(false);
+      
+      // Update selected if we are editing the currently open client
+      if (isEdit && selected?.rut === payload.rut) {
+          setSelected(payload as Cliente);
+      }
     } catch (error) {
       setSaveError(formatApiError(error));
     }
@@ -272,17 +312,30 @@ const Clientes = () => {
 
   const handleDeleteCliente = async (rut: string) => {
     if (!canManageClientes) return;
-    if (!confirm('Eliminar cliente?')) return;
-    await api.delete(`/clientes/${rut}/`);
-    await fetchClientes();
+    const isConfirmed = await confirmAction('¿Eliminar cliente?', 'Esta acción no se puede deshacer.', 'Sí, eliminar');
+    if (!isConfirmed) return;
+    try {
+      await api.delete(`/clientes/${rut}/`);
+      showSuccess('Cliente eliminado');
+      await fetchClientes();
+      if (selected?.rut === rut) handleCloseDrawer();
+    } catch (e) {
+      showError('Error', 'No se pudo eliminar el cliente.');
+    }
   };
 
   const handleDocFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const ext = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() ?? '' : '';
-    if (!ALLOWED_EXTS.includes(ext)) return alert(`Tipo no permitido: ${ALLOWED_EXTS.join(', ')}`);
-    if (file.size > MAX_DOC_SIZE) return alert('Maximo 10 MB');
+    if (!ALLOWED_EXTS.includes(ext)) {
+      showWarning('Tipo no permitido', `Formatos válidos: ${ALLOWED_EXTS.join(', ')}`);
+      return;
+    }
+    if (file.size > MAX_DOC_SIZE) {
+      showWarning('Archivo muy grande', 'El tamaño máximo es de 10 MB.');
+      return;
+    }
     setDocForm((prev) => ({ ...prev, archivo: file }));
   };
 
@@ -293,16 +346,22 @@ const Clientes = () => {
     form.append('archivo', docForm.archivo);
     form.append('descripcion', docForm.descripcion);
     await api.post('/documentos-cliente/', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    showSuccess('Documento cargado');
     setDocForm({ archivo: null, descripcion: '' });
-    setOpenDoc(false);
     await fetchDetail(selected.rut);
   };
 
   const handleDeleteDoc = async (id: number) => {
     if (!canDeleteDocs || !selected) return;
-    if (!confirm('Eliminar documento?')) return;
-    await api.delete(`/documentos-cliente/${id}/`);
-    await fetchDetail(selected.rut);
+    const isConfirmed = await confirmAction('¿Eliminar documento?', 'Se borrará el archivo permanentemente.', 'Sí, eliminar');
+    if (!isConfirmed) return;
+    try {
+      await api.delete(`/documentos-cliente/${id}/`);
+      showSuccess('Documento eliminado');
+      await fetchDetail(selected.rut);
+    } catch (e) {
+      showError('Error', 'No se pudo eliminar el documento.');
+    }
   };
 
   const handleDownloadDoc = async (doc: DocumentoCliente) => {
@@ -319,17 +378,27 @@ const Clientes = () => {
 
   const handleCreateMov = async () => {
     if (!canCreateMov || !selected) return;
-    if (!movForm.monto || Number(movForm.monto) <= 0) return alert('Monto invalido');
+    if (!movForm.monto || Number(movForm.monto) <= 0) {
+      showWarning('Monto inválido', 'El monto debe ser mayor a 0.');
+      return;
+    }
     await api.post('/movimientos-financieros/', { cliente: selected.rut, ...movForm });
+    showSuccess('Movimiento registrado');
     setMovForm({ tipo_movimiento: 'INGRESO', monto: '', fecha: todayISO(), descripcion: '' });
     await fetchDetail(selected.rut);
   };
 
   const handleDeleteMov = async (id: number) => {
     if (!canDeleteMov || !selected) return;
-    if (!confirm('Eliminar movimiento?')) return;
-    await api.delete(`/movimientos-financieros/${id}/`);
-    await fetchDetail(selected.rut);
+    const isConfirmed = await confirmAction('¿Eliminar movimiento?', 'Se borrará el registro financiero.', 'Sí, eliminar');
+    if (!isConfirmed) return;
+    try {
+      await api.delete(`/movimientos-financieros/${id}/`);
+      showSuccess('Movimiento eliminado');
+      await fetchDetail(selected.rut);
+    } catch (e) {
+      showError('Error', 'No se pudo eliminar el movimiento.');
+    }
   };
 
   const filtered = useMemo(
@@ -343,344 +412,438 @@ const Clientes = () => {
   const barMax = Math.max(totalIngresos, totalCostos, 1);
 
   const clienteCols: GridColDef[] = [
-    { field: 'nombre', headerName: 'CLIENTE', width: 230, renderCell: (p) => <b>{p.row.nombre}</b> },
-    { field: 'razon_social', headerName: 'RAZON SOCIAL', width: 240 },
-    { field: 'rut', headerName: 'RUT', width: 150 },
-    { field: 'telefono', headerName: 'TELEFONO', width: 140 },
-    { field: 'correo', headerName: 'CORREO', width: 220 },
+    { field: 'nombre', headerName: 'CLIENTE', flex: 1.5, minWidth: 200, renderCell: (p) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, height: '100%' }}>
+            <Avatar sx={{ width: 32, height: 32, bgcolor: '#2563eb', fontSize: '0.875rem', fontWeight: 'bold' }}>
+                {p.row.nombre.charAt(0).toUpperCase()}
+            </Avatar>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>{p.row.nombre}</Typography>
+        </Box>
+    )},
+    { field: 'razon_social', headerName: 'RAZON SOCIAL', flex: 1.5, minWidth: 200 },
+    { field: 'rut', headerName: 'RUT', flex: 1, minWidth: 120, renderCell: (p) => (
+        <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>{p.row.rut}</Typography>
+    )},
+    { field: 'telefono', headerName: 'TELÉFONO', flex: 1, minWidth: 130 },
     {
       field: 'acciones',
       headerName: 'ACCIONES',
-      width: 160,
+      width: 140,
       sortable: false,
       renderCell: (p) => (
-        <Stack direction="row" spacing={0.5}>
-          <Tooltip title="Ver Ficha"><IconButton size="small" onClick={() => handleOpenFicha(p.row as Cliente)}><VisibilityOutlined fontSize="small" /></IconButton></Tooltip>
+        <Stack direction="row" spacing={0.5} sx={{ height: '100%', alignItems: 'center' }}>
+          <Tooltip title="Ver Ficha"><IconButton size="small" onClick={(e) => { e.stopPropagation(); handleOpenDrawer(p.row as Cliente); }} sx={{ color: '#2563eb', bgcolor: '#eff6ff', '&:hover': { bgcolor: '#dbeafe' } }}><VisibilityOutlined fontSize="small" /></IconButton></Tooltip>
           {canManageClientes && (
-            <Tooltip title="Editar"><IconButton size="small" onClick={() => handleOpenEdit(p.row as Cliente)}><EditOutlined fontSize="small" /></IconButton></Tooltip>
+            <Tooltip title="Editar"><IconButton size="small" onClick={(e) => { e.stopPropagation(); handleOpenEdit(p.row as Cliente); }} sx={{ color: '#64748b', '&:hover': { bgcolor: '#f1f5f9' } }}><EditOutlined fontSize="small" /></IconButton></Tooltip>
           )}
           {canManageClientes && (
-            <Tooltip title="Eliminar"><IconButton size="small" color="error" onClick={() => handleDeleteCliente(p.row.rut)}><DeleteOutline fontSize="small" /></IconButton></Tooltip>
+            <Tooltip title="Eliminar"><IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); handleDeleteCliente(p.row.rut); }} sx={{ '&:hover': { bgcolor: '#fef2f2' } }}><DeleteOutline fontSize="small" /></IconButton></Tooltip>
           )}
         </Stack>
       ),
-    },
-  ];
-
-  const docCols: GridColDef[] = [
-    { field: 'nombre_original', headerName: 'ARCHIVO', width: 220 },
-    { field: 'extension', headerName: 'TIPO', width: 90 },
-    { field: 'tamano_bytes', headerName: 'TAMANO', width: 120, renderCell: (p) => formatBytes(p.value as number) },
-    { field: 'fecha_carga', headerName: 'FECHA CARGA', width: 170, renderCell: (p) => new Date(p.value as string).toLocaleString() },
-    { field: 'descripcion', headerName: 'DESCRIPCION', width: 200, renderCell: (p) => p.value || '-' },
-    { field: 'cargado_por_username', headerName: 'SUBIDO POR', width: 140, renderCell: (p) => p.value || 'Sistema' },
-    {
-      field: 'acciones',
-      headerName: 'ACCIONES',
-      width: 110,
-      sortable: false,
-      renderCell: (p) => (
-        <Stack direction="row" spacing={0.5}>
-          <Tooltip title="Descargar"><IconButton size="small" onClick={() => handleDownloadDoc(p.row as DocumentoCliente)}><Download fontSize="small" /></IconButton></Tooltip>
-          {canDeleteDocs && (
-            <Tooltip title="Eliminar"><IconButton size="small" color="error" onClick={() => handleDeleteDoc(p.row.id)}><DeleteOutline fontSize="small" /></IconButton></Tooltip>
-          )}
-        </Stack>
-      ),
-    },
-  ];
-
-  const movCols: GridColDef[] = [
-    { field: 'tipo_movimiento', headerName: 'TIPO', width: 120, renderCell: (p) => <Chip size="small" label={p.value as string} /> },
-    { field: 'monto', headerName: 'MONTO', width: 140, renderCell: (p) => money.format(parseAmount(p.value)) },
-    { field: 'fecha', headerName: 'FECHA', width: 120, renderCell: (p) => new Date(`${p.value as string}T00:00:00`).toLocaleDateString() },
-    { field: 'descripcion', headerName: 'DESCRIPCION', width: 250, renderCell: (p) => p.value || '-' },
-    { field: 'creado_por_username', headerName: 'REGISTRADO POR', width: 160, renderCell: (p) => p.value || 'Sistema' },
-    {
-      field: 'acciones',
-      headerName: 'ACCIONES',
-      width: 90,
-      sortable: false,
-      renderCell: (p) =>
-        canDeleteMov ? <IconButton size="small" color="error" onClick={() => handleDeleteMov(p.row.id)}><DeleteOutline fontSize="small" /></IconButton> : null,
     },
   ];
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* CABECERA */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
-          <Typography variant="h4" fontWeight={700}>Cartera de Clientes</Typography>
-          <Typography variant="body2" color="text.secondary">Gestor documental y financiero por cliente.</Typography>
+          <Typography variant="h4" fontWeight={800} sx={{ color: '#0f172a', letterSpacing: '-0.5px' }}>
+            Directorio de Clientes
+          </Typography>
+          <Typography variant="body1" sx={{ color: '#64748b', mt: 0.5 }}>
+            Gestión centralizada documental, financiera y operativa.
+          </Typography>
         </Box>
-        {canManageClientes && <Button variant="contained" startIcon={<Add />} onClick={handleOpenCreate}>Nuevo Cliente</Button>}
+        {canManageClientes && (
+            <Button variant="contained" startIcon={<Add />} onClick={handleOpenCreate} sx={{ borderRadius: 2, textTransform: 'none', px: 3, py: 1, fontWeight: 'bold', boxShadow: '0 4px 6px -1px rgb(37 99 235 / 0.2)' }}>
+                Nuevo Cliente
+            </Button>
+        )}
       </Box>
 
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <TextField fullWidth size="small" placeholder="Buscar por cliente o RUT..." value={searchText} onChange={(e) => setSearchText(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }} />
+      {/* BARRA BUSQUEDA */}
+      <Paper elevation={0} sx={{ p: 2, mb: 3, border: '1px solid #e2e8f0', borderRadius: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+        <TextField 
+            fullWidth size="small" 
+            placeholder="Buscar por cliente o RUT..." 
+            value={searchText} 
+            onChange={(e) => setSearchText(e.target.value)} 
+            InputProps={{ startAdornment: <InputAdornment position="start"><Search sx={{ color: '#94a3b8' }}/></InputAdornment>, sx: { borderRadius: 2, bgcolor: '#f8fafc' } }} 
+        />
+        <Chip label={`${filtered.length} Registros`} size="small" sx={{ fontWeight: 'bold', bgcolor: '#e2e8f0', color: '#475569' }} />
       </Paper>
 
-      <Paper sx={{ height: 420, mb: 2 }}>
-        <DataGrid rows={filtered} columns={clienteCols} getRowId={(r) => r.rut} loading={loadingClientes} onRowClick={(p) => setSelected(p.row as Cliente)} />
+      {/* TABLA PRINCIPAL */}
+      <Paper elevation={0} sx={{ flex: 1, minHeight: 400, width: '100%', border: '1px solid #e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+        <DataGrid 
+            rows={filtered} 
+            columns={clienteCols} 
+            getRowId={(r) => r.rut} 
+            loading={loadingClientes} 
+            onRowClick={(p) => handleOpenDrawer(p.row as Cliente)} 
+            disableRowSelectionOnClick
+            sx={{
+                border: 'none',
+                '& .MuiDataGrid-columnHeaders': { bgcolor: '#f8fafc', color: '#475569', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' },
+                '& .MuiDataGrid-cell': { borderBottom: '1px solid #f1f5f9' },
+                '& .MuiDataGrid-row:hover': { bgcolor: '#f8fafc', cursor: 'pointer' }
+            }}
+        />
       </Paper>
 
-      {selected && (
-        <Stack spacing={2}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="subtitle1" fontWeight={700}>{selected.nombre} ({selected.rut})</Typography>
-            <Typography variant="body2" color="text.secondary">{selected.razon_social}</Typography>
-          </Paper>
-
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-            <Paper sx={{ p: 2, flex: 1 }}><Typography variant="caption">Ingresos</Typography><Typography variant="h6">{money.format(totalIngresos)}</Typography></Paper>
-            <Paper sx={{ p: 2, flex: 1 }}><Typography variant="caption">Costos</Typography><Typography variant="h6">{money.format(totalCostos)}</Typography></Paper>
-            <Paper sx={{ p: 2, flex: 1 }}><Typography variant="caption">Ganancia neta</Typography><Typography variant="h6" color={neta >= 0 ? 'success.main' : 'error.main'}>{money.format(neta)}</Typography></Paper>
-          </Stack>
-
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>Grafico comparativo</Typography>
-            <Typography variant="caption">Ingresos</Typography>
-            <Box sx={{ height: 10, bgcolor: '#e2e8f0', borderRadius: 2, mb: 1 }}><Box sx={{ height: 10, bgcolor: '#16a34a', borderRadius: 2, width: `${(totalIngresos / barMax) * 100}%` }} /></Box>
-            <Typography variant="caption">Costos</Typography>
-            <Box sx={{ height: 10, bgcolor: '#e2e8f0', borderRadius: 2 }}><Box sx={{ height: 10, bgcolor: '#dc2626', borderRadius: 2, width: `${(totalCostos / barMax) * 100}%` }} /></Box>
-          </Paper>
-
-          <Paper sx={{ p: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="h6">Documentos del cliente</Typography>
-              {canCreateDocs && <Button startIcon={<CloudUpload />} variant="contained" onClick={() => setOpenDoc(true)}>Cargar</Button>}
-            </Box>
-            <Alert severity="info" sx={{ mb: 1 }}>Tipos permitidos: {ALLOWED_EXTS.join(', ')}. Max: 10 MB.</Alert>
-            <Box sx={{ height: 300 }}>
-              <DataGrid rows={docs} columns={docCols} loading={loadingDetail} />
-            </Box>
-          </Paper>
-
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1 }}>Registro financiero</Typography>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} sx={{ mb: 1 }}>
-              <TextField select size="small" label="Tipo" value={movForm.tipo_movimiento} onChange={(e) => setMovForm((p) => ({ ...p, tipo_movimiento: e.target.value as 'INGRESO' | 'COSTO' }))} sx={{ minWidth: 140 }}>
-                <MenuItem value="INGRESO">Ingreso</MenuItem><MenuItem value="COSTO">Costo</MenuItem>
-              </TextField>
-              <TextField size="small" label="Monto" type="number" value={movForm.monto} onChange={(e) => setMovForm((p) => ({ ...p, monto: e.target.value }))} />
-              <TextField size="small" type="date" label="Fecha" InputLabelProps={{ shrink: true }} value={movForm.fecha} onChange={(e) => setMovForm((p) => ({ ...p, fecha: e.target.value }))} />
-              <TextField size="small" label="Descripcion" value={movForm.descripcion} onChange={(e) => setMovForm((p) => ({ ...p, descripcion: e.target.value }))} fullWidth />
-              {canCreateMov && <Button variant="contained" onClick={handleCreateMov}>Registrar</Button>}
-            </Stack>
-            {!canCreateMov && <Alert severity="warning" sx={{ mb: 1 }}>Acceso de solo lectura para movimientos.</Alert>}
-            <Box sx={{ height: 300 }}>
-              <DataGrid rows={movs} columns={movCols} loading={loadingDetail} />
-            </Box>
-          </Paper>
-        </Stack>
-      )}
-
-      {!selected && !loadingClientes && <Alert severity="info" sx={{ mt: 2 }}>No hay clientes para mostrar.</Alert>}
-
-      <Dialog open={openCliente && canManageClientes} onClose={() => setOpenCliente(false)} fullScreen={isMobile} maxWidth="sm" fullWidth>
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee' }}>
-          <Typography variant="h6">{isEdit ? 'Editar Cliente' : 'Nuevo Cliente'}</Typography>
-          <IconButton onClick={() => setOpenCliente(false)}><Close /></IconButton>
+      {/* === MODAL: CREAR / EDITAR CLIENTE === */}
+      <Dialog open={openCliente && canManageClientes} onClose={() => setOpenCliente(false)} fullScreen={isMobile} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4, backgroundImage: 'none' } }}>
+        <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', bgcolor: '#f8fafc' }}>
+          <Typography variant="h6" fontWeight={700} color="#0f172a">{isEdit ? 'Modificar Información del Cliente' : 'Registrar Nuevo Cliente'}</Typography>
+          <IconButton onClick={() => setOpenCliente(false)} size="small"><Close /></IconButton>
         </Box>
-        <DialogContent sx={{ pt: 2 }}>
-          <Stack spacing={1.5}>
-            {saveError && <Alert severity="error">{saveError}</Alert>}
-            <TextField size="small" label="RUT*" value={clienteForm.rut} disabled={isEdit} onChange={(e) => setClienteForm((p) => ({ ...p, rut: e.target.value }))} />
-            <TextField size="small" label="Nombre*" value={clienteForm.nombre} onChange={(e) => setClienteForm((p) => ({ ...p, nombre: e.target.value }))} />
-            <TextField size="small" label="Razon social*" value={clienteForm.razon_social} onChange={(e) => setClienteForm((p) => ({ ...p, razon_social: e.target.value }))} />
-            <TextField size="small" label="Telefono" value={clienteForm.telefono} onChange={(e) => setClienteForm((p) => ({ ...p, telefono: e.target.value }))} />
-            <TextField size="small" label="Correo" value={clienteForm.correo} onChange={(e) => setClienteForm((p) => ({ ...p, correo: e.target.value }))} />
-            <TextField size="small" label="Descripcion" multiline rows={3} value={clienteForm.descripcion} onChange={(e) => setClienteForm((p) => ({ ...p, descripcion: e.target.value }))} />
+        <DialogContent sx={{ p: 3 }}>
+          <Stack spacing={2.5}>
+            {saveError && <Alert severity="error" sx={{ borderRadius: 2 }}>{saveError}</Alert>}
+            
+            <Box sx={{ display: 'flex', gap: 2 }}>
+                <TextField size="small" label="RUT*" value={clienteForm.rut} disabled={isEdit} onChange={(e) => setClienteForm((p) => ({ ...p, rut: e.target.value }))} sx={{ flex: 1 }} />
+            </Box>
+            
+            <TextField size="small" label="Nombre Comercial*" value={clienteForm.nombre} onChange={(e) => setClienteForm((p) => ({ ...p, nombre: e.target.value }))} fullWidth />
+            <TextField size="small" label="Razón Social*" value={clienteForm.razon_social} onChange={(e) => setClienteForm((p) => ({ ...p, razon_social: e.target.value }))} fullWidth />
+            
+            <Box sx={{ display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row' }}>
+                <TextField size="small" label="Teléfono de Contacto" value={clienteForm.telefono} onChange={(e) => setClienteForm((p) => ({ ...p, telefono: e.target.value }))} sx={{ flex: 1 }} />
+                <TextField size="small" label="Correo Electrónico" value={clienteForm.correo} onChange={(e) => setClienteForm((p) => ({ ...p, correo: e.target.value }))} sx={{ flex: 1 }} />
+            </Box>
+            
+            <TextField size="small" label="Observaciones o Descripción Adicional" multiline rows={3} value={clienteForm.descripcion} onChange={(e) => setClienteForm((p) => ({ ...p, descripcion: e.target.value }))} fullWidth />
           </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenCliente(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleSaveCliente}>Guardar</Button>
+        <DialogActions sx={{ p: 3, pt: 0, bgcolor: '#fff' }}>
+          <Button onClick={() => setOpenCliente(false)} sx={{ color: '#64748b', fontWeight: 'bold' }}>Cancelar</Button>
+          <Button variant="contained" onClick={handleSaveCliente} sx={{ borderRadius: 2, fontWeight: 'bold' }}>{isEdit ? 'Guardar Cambios' : 'Completar Registro'}</Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openDoc && canCreateDocs} onClose={() => setOpenDoc(false)} fullScreen={isMobile} maxWidth="sm" fullWidth>
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee' }}>
-          <Typography variant="h6">Cargar documento</Typography>
-          <IconButton onClick={() => setOpenDoc(false)}><Close /></IconButton>
-        </Box>
-        <DialogContent sx={{ pt: 2 }}>
-          <Stack spacing={1.5}>
-            <Typography variant="body2">Cliente: <b>{selected?.nombre}</b></Typography>
-            <Button variant="outlined" component="label" sx={{ justifyContent: 'flex-start', textTransform: 'none' }}>
-              {docForm.archivo ? docForm.archivo.name : 'Seleccionar archivo...'}
-              <input type="file" hidden onChange={handleDocFile} />
-            </Button>
-            <TextField size="small" label="Descripcion" multiline rows={3} value={docForm.descripcion} onChange={(e) => setDocForm((p) => ({ ...p, descripcion: e.target.value }))} />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDoc(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleUploadDoc}>Subir</Button>
-        </DialogActions>
-      </Dialog>
 
-      {/* === MODAL: FICHA COMPLETA DEL CLIENTE === */}
-      {fichaCliente && (
-        <Dialog open={openFicha} onClose={() => setOpenFicha(false)} fullScreen={isMobile} maxWidth="lg" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-          {/* ENCABEZADO */}
-          <Box sx={{ bgcolor: '#0f172a', color: 'white', p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box>
-              <Typography variant="h5" fontWeight="bold" sx={{ mb: 0.5 }}>{fichaCliente.nombre}</Typography>
-              <Typography variant="body2" sx={{ opacity: 0.8 }}>RUT: {fichaCliente.rut}</Typography>
-            </Box>
-            <IconButton onClick={() => setOpenFicha(false)} sx={{ color: 'white' }}><Close /></IconButton>
-          </Box>
-
-          {/* CONTENIDO */}
-          <DialogContent sx={{ p: 3, maxHeight: '70vh', overflow: 'auto' }}>
-            <Stack spacing={3}>
-              {/* SECCIÓN 1: DATOS GENERALES */}
-              <Box>
-                <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  Datos generales
-                </Typography>
-                <Paper elevation={0} sx={{ p: 2.5, border: '1px solid #e2e8f0', borderRadius: 2 }}>
-                  <Stack spacing={2}>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary" fontWeight="bold">RAZÓN SOCIAL</Typography>
-                        <Typography variant="body2">{fichaCliente.razon_social || '-'}</Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary" fontWeight="bold">TELÉFONO</Typography>
-                        <Typography variant="body2">{fichaCliente.telefono || '-'}</Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary" fontWeight="bold">CORREO</Typography>
-                        <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{fichaCliente.correo || '-'}</Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary" fontWeight="bold">DESCRIPCIÓN</Typography>
-                        <Typography variant="body2">{fichaCliente.descripcion || '-'}</Typography>
-                      </Box>
+      {/* === DRAWER: FICHA COMPLETA (TABS) === */}
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={handleCloseDrawer}
+        PaperProps={{ sx: { width: { xs: '100%', md: '800px' }, maxWidth: '100%', bgcolor: '#f8fafc' } }}
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}
+      >
+        {selected && (
+          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {/* Drawer Header */}
+            <Box sx={{ bgcolor: '#0f172a', color: 'white', p: 4, position: 'relative' }}>
+                <IconButton onClick={handleCloseDrawer} sx={{ position: 'absolute', top: 16, right: 16, color: '#94a3b8', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                    <Close />
+                </IconButton>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mt: 1 }}>
+                    <Avatar sx={{ width: 80, height: 80, bgcolor: '#2563eb', fontSize: '2rem', fontWeight: 'bold', border: '3px solid rgba(255,255,255,0.2)' }}>
+                        {selected.nombre.charAt(0).toUpperCase()}
+                    </Avatar>
+                    <Box>
+                        <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.5px', mb: 0.5 }}>{selected.nombre}</Typography>
+                        <Typography variant="body1" sx={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Business fontSize="small" /> {selected.razon_social}
+                        </Typography>
                     </Box>
-                  </Stack>
-                </Paper>
-              </Box>
-
-              {/* SECCIÓN 2: RESUMEN FINANCIERO */}
-              <Box>
-                <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  Resumen financiero
-                </Typography>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <Paper elevation={0} sx={{ p: 2, flex: 1, border: '2px solid #16a34a', borderRadius: 2, bgcolor: '#f0fdf4' }}>
-                    <Typography variant="caption" color="text.secondary" fontWeight="bold">INGRESOS</Typography>
-                    <Typography variant="h6" color="success.main" fontWeight="bold">{money.format(parseAmount(resumen?.total_ingresos))}</Typography>
-                  </Paper>
-                  <Paper elevation={0} sx={{ p: 2, flex: 1, border: '2px solid #dc2626', borderRadius: 2, bgcolor: '#fef2f2' }}>
-                    <Typography variant="caption" color="text.secondary" fontWeight="bold">COSTOS</Typography>
-                    <Typography variant="h6" color="error.main" fontWeight="bold">{money.format(parseAmount(resumen?.total_costos))}</Typography>
-                  </Paper>
-                  <Paper elevation={0} sx={{ p: 2, flex: 1, border: '2px solid #2563eb', borderRadius: 2, bgcolor: '#eff6ff' }}>
-                    <Typography variant="caption" color="text.secondary" fontWeight="bold">GANANCIA NETA</Typography>
-                    <Typography variant="h6" color={parseAmount(resumen?.ganancia_neta) >= 0 ? 'success.main' : 'error.main'} fontWeight="bold">
-                      {money.format(parseAmount(resumen?.ganancia_neta))}
-                    </Typography>
-                  </Paper>
-                </Stack>
-              </Box>
-
-              {/* SECCIÓN 3: TAREAS VINCULADAS */}
-              <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Typography variant="h6" fontWeight="bold">Tareas vinculadas</Typography>
-                  <Chip label={tareas.length} size="small" color="primary" variant="outlined" />
                 </Box>
-                {tareas.length > 0 ? (
-                  <Paper elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
-                    {tareas.map((tarea, idx) => (
-                      <Box key={tarea.id} sx={{ p: 2, borderBottom: idx < tareas.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 1 }}>
-                          <Box sx={{ flex: 1 }}>
-                            <Typography variant="subtitle2" fontWeight="bold">{tarea.nombre}</Typography>
-                            <Typography variant="caption" color="text.secondary">Responsable: {tarea.responsable}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Chip size="small" label={tarea.estado} variant="outlined" color={tarea.estado === 'COMPLETADA' ? 'success' : tarea.estado === 'CANCELADA' ? 'default' : 'primary'} />
-                            <Chip size="small" label={tarea.prioridad} variant="outlined" color={tarea.prioridad === 'ALTA' ? 'error' : tarea.prioridad === 'MEDIA' ? 'warning' : 'default'} />
-                          </Box>
-                        </Box>
-                        {tarea.informacion && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>{tarea.informacion}</Typography>}
-                        <Typography variant="caption" color="text.secondary">Fecha límite: {new Date(`${tarea.fecha_limite}T00:00:00`).toLocaleDateString()}</Typography>
-                      </Box>
-                    ))}
-                  </Paper>
-                ) : (
-                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: '#f8fafc', borderRadius: 2 }}>
-                    <Typography variant="body2" color="text.secondary">No hay tareas vinculadas a este cliente</Typography>
-                  </Paper>
-                )}
-              </Box>
+            </Box>
 
-              {/* SECCIÓN 4: DOCUMENTOS */}
-              <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Typography variant="h6" fontWeight="bold">Documentos</Typography>
-                  <Chip label={docs.length} size="small" color="primary" variant="outlined" />
-                </Box>
-                {docs.length > 0 ? (
-                  <Paper elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, maxHeight: 300, overflow: 'auto' }}>
-                    {docs.map((doc, idx) => (
-                      <Box key={doc.id} sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: idx < docs.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="body2" fontWeight="bold">{doc.nombre_original}</Typography>
-                          <Typography variant="caption" color="text.secondary">{doc.extension.toUpperCase()} - {formatBytes(doc.tamano_bytes)} - {new Date(doc.fecha_carga).toLocaleDateString()}</Typography>
-                          {doc.descripcion && <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>{doc.descripcion}</Typography>}
-                        </Box>
-                        <IconButton size="small" onClick={() => handleDownloadDoc(doc)}><Download fontSize="small" /></IconButton>
-                      </Box>
-                    ))}
-                  </Paper>
-                ) : (
-                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: '#f8fafc', borderRadius: 2 }}>
-                    <Typography variant="body2" color="text.secondary">No hay documentos registrados</Typography>
-                  </Paper>
-                )}
-              </Box>
+            {/* Tabs Header */}
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: '#fff', px: 2 }}>
+                <Tabs value={tabIndex} onChange={(_, nv) => setTabIndex(nv)} variant={isMobile ? "scrollable" : "standard"} scrollButtons="auto" 
+                      textColor="primary" indicatorColor="primary" sx={{ '& .MuiTab-root': { fontWeight: 600, textTransform: 'none', fontSize: '0.95rem', minHeight: 60, py: 2 } }}>
+                    <Tab icon={<Assessment sx={{ mb: 0 }} fontSize="small" />} iconPosition="start" label="Resumen General" />
+                    <Tab icon={<Folder sx={{ mb: 0 }} fontSize="small" />} iconPosition="start" label="Documentación" disabled={loadingDetail} />
+                    <Tab icon={<MonetizationOn sx={{ mb: 0 }} fontSize="small" />} iconPosition="start" label="Finanzas" disabled={loadingDetail} />
+                    <Tab icon={<Assignment sx={{ mb: 0 }} fontSize="small" />} iconPosition="start" label="Tareas" disabled={loadingDetail} />
+                </Tabs>
+            </Box>
 
-              {/* SECCIÓN 5: HISTORIAL FINANCIERO */}
-              <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Typography variant="h6" fontWeight="bold">Historial financiero</Typography>
-                  <Chip label={movs.length} size="small" color="primary" variant="outlined" />
-                </Box>
-                {movs.length > 0 ? (
-                  <Paper elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, maxHeight: 300, overflow: 'auto' }}>
-                    {movs.map((mov, idx) => (
-                      <Box key={mov.id} sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: idx < movs.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
-                        <Box sx={{ flex: 1 }}>
-                          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 0.5 }}>
-                            <Chip size="small" label={mov.tipo_movimiento} sx={{ backgroundColor: mov.tipo_movimiento === 'INGRESO' ? '#dcfce7' : '#fee2e2', color: mov.tipo_movimiento === 'INGRESO' ? '#166534' : '#991b1b' }} />
-                            <Typography variant="body2" fontWeight="bold">{money.format(parseAmount(mov.monto))}</Typography>
-                          </Box>
-                          <Typography variant="caption" color="text.secondary">{new Date(`${mov.fecha}T00:00:00`).toLocaleDateString()} - {mov.creado_por_username || 'Sistema'}</Typography>
-                          {mov.descripcion && <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>{mov.descripcion}</Typography>}
-                        </Box>
-                      </Box>
-                    ))}
-                  </Paper>
-                ) : (
-                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: '#f8fafc', borderRadius: 2 }}>
-                    <Typography variant="body2" color="text.secondary">No hay movimientos registrados</Typography>
-                  </Paper>
-                )}
-              </Box>
-            </Stack>
-          </DialogContent>
+            {/* Pestañas Contenido */}
+            <Box sx={{ flex: 1, overflowY: 'hidden' }}>
+                
+                {/* 1. RESUMEN GENERAL */}
+                <CustomTabPanel value={tabIndex} index={0}>
+                    <Stack spacing={4} sx={{ maxWidth: '100%', pb: 5 }}>
+                        {/* KPI Financieros */}
+                        <Box>
+                            <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 700, mb: 1.5, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                Visión Financiera Global
+                            </Typography>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                <Paper elevation={0} sx={{ p: 2.5, flex: 1, border: '1px solid #bbf7d0', borderRadius: 3, bgcolor: '#f0fdf4', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <TrendingUp sx={{ color: '#16a34a' }} fontSize="small" />
+                                        <Typography variant="caption" sx={{ color: '#166534', fontWeight: 700 }}>INGRESOS TOTALES</Typography>
+                                    </Box>
+                                    <Typography variant="h5" sx={{ color: '#15803d', fontWeight: 800 }}>{money.format(totalIngresos)}</Typography>
+                                </Paper>
+                                
+                                <Paper elevation={0} sx={{ p: 2.5, flex: 1, border: '1px solid #fecaca', borderRadius: 3, bgcolor: '#fef2f2', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <TrendingDown sx={{ color: '#dc2626' }} fontSize="small" />
+                                        <Typography variant="caption" sx={{ color: '#991b1b', fontWeight: 700 }}>COSTOS / INVERSIÓN</Typography>
+                                    </Box>
+                                    <Typography variant="h5" sx={{ color: '#b91c1c', fontWeight: 800 }}>{money.format(totalCostos)}</Typography>
+                                </Paper>
 
-          {/* PIE DE PÁGINA */}
-          <Box sx={{ p: 2, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-            <Button onClick={() => setOpenFicha(false)} variant="contained" sx={{ bgcolor: '#0f172a' }}>Cerrar Ficha</Button>
+                                <Paper elevation={0} sx={{ p: 2.5, flex: 1, border: '1px solid #bfdbfe', borderRadius: 3, bgcolor: '#eff6ff', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <MonetizationOn sx={{ color: '#2563eb' }} fontSize="small" />
+                                        <Typography variant="caption" sx={{ color: '#1e40af', fontWeight: 700 }}>BENEFICIO NETO</Typography>
+                                    </Box>
+                                    <Typography variant="h5" sx={{ color: neta >= 0 ? '#1d4ed8' : '#dc2626', fontWeight: 800 }}>{money.format(neta)}</Typography>
+                                </Paper>
+                            </Stack>
+
+                            {totalIngresos > 0 || totalCostos > 0 ? (
+                                <Box sx={{ mt: 3, bgcolor: '#fff', p: 2, borderRadius: 3, border: '1px solid #e2e8f0' }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>Proporción (Ingresos vs Costos)</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', height: 12, borderRadius: 6, overflow: 'hidden', bgcolor: '#f1f5f9' }}>
+                                        <Box sx={{ width: `${(totalIngresos / barMax) * 100}%`, bgcolor: '#22c55e', transition: 'width 1s ease' }} />
+                                    </Box>
+                                    <Box sx={{ display: 'flex', height: 12, borderRadius: 6, overflow: 'hidden', bgcolor: '#f1f5f9', mt: 1 }}>
+                                        <Box sx={{ width: `${(totalCostos / barMax) * 100}%`, bgcolor: '#ef4444', transition: 'width 1s ease' }} />
+                                    </Box>
+                                </Box>
+                            ) : null}
+                        </Box>
+
+                        <Divider sx={{ borderColor: '#e2e8f0' }} />
+
+                        {/* Datos de Contacto */}
+                        <Box>
+                            <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 700, mb: 1.5, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                Información de Contacto
+                            </Typography>
+                            <Paper elevation={0} sx={{ bgcolor: '#fff', borderRadius: 3, border: '1px solid #e2e8f0', p: 3 }}>
+                                <Stack spacing={2.5}>
+                                    <Box sx={{ display: 'flex', gap: 2 }}>
+                                        <Box sx={{ p: 1, bgcolor: '#f1f5f9', borderRadius: 2, display: 'flex', height: 'fit-content' }}>
+                                            <ContactPhone sx={{ color: '#64748b' }} />
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary" fontWeight={600} display="block">IDENTIFICADOR / RUT</Typography>
+                                            <Typography variant="body1" fontWeight={500} color="#0f172a">{selected.rut}</Typography>
+                                        </Box>
+                                    </Box>
+                                    
+                                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 3 }}>
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary" fontWeight={600} display="block">CORREO ELECTRÓNICO</Typography>
+                                            <Typography variant="body1" fontWeight={500} color="#0f172a">{selected.correo || 'No registrado'}</Typography>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary" fontWeight={600} display="block">TELÉFONO COMPAÑÍA</Typography>
+                                            <Typography variant="body1" fontWeight={500} color="#0f172a">{selected.telefono || 'No registrado'}</Typography>
+                                        </Box>
+                                    </Box>
+
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary" fontWeight={600} display="block">DESCRIPCIÓN OPERATIVA</Typography>
+                                        <Typography variant="body2" sx={{ color: '#475569', mt: 0.5, bgcolor: '#f8fafc', p: 1.5, borderRadius: 2 }}>
+                                            {selected.descripcion || 'Sin información adicional provista.'}
+                                        </Typography>
+                                    </Box>
+                                </Stack>
+                            </Paper>
+                        </Box>
+                    </Stack>
+                </CustomTabPanel>
+
+
+                {/* 2. DOCUMENTACIÓN */}
+                <CustomTabPanel value={tabIndex} index={1}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                        <Typography variant="subtitle1" fontWeight={700} color="#0f172a">Archivos y Anexos</Typography>
+                        <Chip label={`${docs.length} Documentos`} size="small" sx={{ fontWeight: 600, bgcolor: '#e2e8f0', color: '#475569' }} />
+                    </Box>
+
+                    {/* Formulario rápido para subir */}
+                    {canCreateDocs && (
+                        <Paper elevation={0} sx={{ p: 2.5, mb: 4, bgcolor: '#fff', border: '1px dashed #cbd5e1', borderRadius: 3 }}>
+                            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>Subir Nuevo Archivo</Typography>
+                            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                                <Button variant="outlined" component="label" sx={{ flex: 1, justifyContent: 'flex-start', textTransform: 'none', borderColor: '#cbd5e1', color: docForm.archivo ? '#0f172a' : '#64748b' }}>
+                                    <CloudUpload sx={{ mr: 1 }} />
+                                    {docForm.archivo ? docForm.archivo.name : 'Seleccionar PDF, Word, Excel o imagen...'}
+                                    <input type="file" hidden onChange={handleDocFile} />
+                                </Button>
+                                <TextField size="small" placeholder="Descripción breve (opcional)" value={docForm.descripcion} onChange={(e) => setDocForm((p) => ({ ...p, descripcion: e.target.value }))} sx={{ flex: 1 }} />
+                                <Button variant="contained" onClick={handleUploadDoc} disabled={!docForm.archivo} sx={{ boxShadow: 'none', px: 3 }}>
+                                    Cargar
+                                </Button>
+                            </Stack>
+                        </Paper>
+                    )}
+
+                    {docs.length > 0 ? (
+                        <Stack spacing={1.5}>
+                            {docs.map((doc) => (
+                                <Paper key={doc.id} elevation={0} sx={{ bgcolor: '#fff', border: '1px solid #e2e8f0', borderRadius: 3, p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all 0.2s', '&:hover': { borderColor: '#cbd5e1', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' } }}>
+                                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                        <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#f1f5f9', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                            <Typography variant="button" sx={{ color: '#64748b', fontWeight: 800 }}>{doc.extension.substring(0,3)}</Typography>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0f172a' }}>{doc.nombre_original}</Typography>
+                                            <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                                {formatBytes(doc.tamano_bytes)} • Subido por {doc.cargado_por_username || 'Sistema'} el {new Date(doc.fecha_carga).toLocaleDateString()}
+                                            </Typography>
+                                            {doc.descripcion && <Typography variant="caption" display="block" sx={{ mt: 0.5, color: '#475569' }}>{doc.descripcion}</Typography>}
+                                        </Box>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        <Tooltip title="Descargar"><IconButton size="small" onClick={() => handleDownloadDoc(doc)} sx={{ bgcolor: '#f8fafc' }}><Download fontSize="small" /></IconButton></Tooltip>
+                                        {canDeleteDocs && (
+                                            <Tooltip title="Eliminar Permanente"><IconButton size="small" color="error" onClick={() => handleDeleteDoc(doc.id)} sx={{ bgcolor: '#fef2f2' }}><DeleteOutline fontSize="small" /></IconButton></Tooltip>
+                                        )}
+                                    </Box>
+                                </Paper>
+                            ))}
+                        </Stack>
+                    ) : (
+                        <Box sx={{ textAlign: 'center', p: 6, bgcolor: '#fff', border: '1px solid #e2e8f0', borderRadius: 3 }}>
+                            <Folder sx={{ fontSize: 48, color: '#cbd5e1', mb: 2 }} />
+                            <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#475569' }}>Repositorio Vacío</Typography>
+                            <Typography variant="body2" sx={{ color: '#94a3b8' }}>No hay archivos vinculados a este cliente.</Typography>
+                        </Box>
+                    )}
+                </CustomTabPanel>
+
+
+                {/* 3. FINANZAS */}
+                <CustomTabPanel value={tabIndex} index={2}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                        <Typography variant="subtitle1" fontWeight={700} color="#0f172a">Libro Mayor del Cliente</Typography>
+                    </Box>
+
+                    {canCreateMov && (
+                        <Paper elevation={0} sx={{ p: 2.5, mb: 4, bgcolor: '#fff', border: '1px solid #e2e8f0', borderRadius: 3 }}>
+                            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>Registrar Flujo de Caja</Typography>
+                            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+                                <TextField select size="small" label="Operación" value={movForm.tipo_movimiento} onChange={(e) => setMovForm((p) => ({ ...p, tipo_movimiento: e.target.value as 'INGRESO' | 'COSTO' }))} sx={{ minWidth: 130 }} SelectProps={{ MenuProps: { sx: { zIndex: 1400 } } }}>
+                                    <MenuItem value="INGRESO">Ingreso (+)</MenuItem>
+                                    <MenuItem value="COSTO">Costo (-)</MenuItem>
+                                </TextField>
+                                <TextField size="small" label="Monto" type="number" placeholder="Ej. 150000" value={movForm.monto} onChange={(e) => setMovForm((p) => ({ ...p, monto: e.target.value }))} sx={{ flex: 1, minWidth: 130 }} />
+                                <TextField size="small" type="date" label="Fecha" InputLabelProps={{ shrink: true }} value={movForm.fecha} onChange={(e) => setMovForm((p) => ({ ...p, fecha: e.target.value }))} sx={{ minWidth: 140 }} />
+                                <TextField size="small" label="Concepto / Detalle" value={movForm.descripcion} onChange={(e) => setMovForm((p) => ({ ...p, descripcion: e.target.value }))} sx={{ flex: 2 }} />
+                                <Button variant="contained" onClick={handleCreateMov} sx={{ boxShadow: 'none', px: 3, fontWeight: 'bold' }}>
+                                    Anotar
+                                </Button>
+                            </Stack>
+                        </Paper>
+                    )}
+
+                    {movs.length > 0 ? (
+                        <Paper elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+                            <Box sx={{ maxHeight: 500, overflow: 'auto', bgcolor: '#fff' }}>
+                                {movs.map((mov, idx) => {
+                                    const isIngreso = mov.tipo_movimiento === 'INGRESO';
+                                    return (
+                                        <Box key={mov.id} sx={{ p: 2.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: idx < movs.length - 1 ? '1px solid #f1f5f9' : 'none', '&:hover': { bgcolor: '#f8fafc' } }}>
+                                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flex: 1 }}>
+                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: isIngreso ? '#dcfce7' : '#fee2e2' }}>
+                                                    {isIngreso ? <TrendingUp sx={{ color: '#166534' }} fontSize="small" /> : <TrendingDown sx={{ color: '#991b1b' }} fontSize="small" />}
+                                                </Box>
+                                                <Box>
+                                                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: isIngreso ? '#15803d' : '#b91c1c' }}>
+                                                        {isIngreso ? '+' : '-'}{money.format(parseAmount(mov.monto))}
+                                                    </Typography>
+                                                    <Typography variant="body2" sx={{ color: '#475569', fontWeight: 500 }}>
+                                                        {mov.descripcion || 'Sin concepto'}
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                                                        {new Date(`${mov.fecha}T00:00:00`).toLocaleDateString()} • Por {mov.creado_por_username || 'Sistema'}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                            {canDeleteMov && (
+                                                <Tooltip title="Anular Registro">
+                                                    <IconButton size="small" color="error" onClick={() => handleDeleteMov(mov.id)} sx={{ opacity: 0.5, '&:hover': { opacity: 1, bgcolor: '#fef2f2' } }}>
+                                                        <DeleteOutline fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
+                                        </Box>
+                                    );
+                                })}
+                            </Box>
+                        </Paper>
+                    ) : (
+                        <Box sx={{ textAlign: 'center', p: 6, bgcolor: '#fff', border: '1px solid #e2e8f0', borderRadius: 3 }}>
+                            <MonetizationOn sx={{ fontSize: 48, color: '#cbd5e1', mb: 2 }} />
+                            <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#475569' }}>Sin Movimientos</Typography>
+                            <Typography variant="body2" sx={{ color: '#94a3b8' }}>Este cliente no presenta ningún historial financiero registrado.</Typography>
+                        </Box>
+                    )}
+                </CustomTabPanel>
+
+
+                {/* 4. TAREAS */}
+                <CustomTabPanel value={tabIndex} index={3}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                        <Typography variant="subtitle1" fontWeight={700} color="#0f172a">Planificación y Tareas Operativas</Typography>
+                        <Chip label={`${tareas.length} Tareas Totales`} size="small" sx={{ fontWeight: 600, bgcolor: '#e2e8f0', color: '#475569' }} />
+                    </Box>
+
+                    {tareas.length > 0 ? (
+                      <Stack spacing={2} sx={{ pb: 4 }}>
+                        {tareas.map((tarea) => {
+                            const isDone = tarea.estado === 'COMPLETADA';
+                            return (
+                                <Paper key={tarea.id} elevation={0} sx={{ p: 2.5, bgcolor: '#fff', border: `1px solid ${isDone ? '#bbf7d0' : '#e2e8f0'}`, borderLeft: `4px solid ${isDone ? '#22c55e' : tarea.prioridad === 'ALTA' ? '#ef4444' : tarea.prioridad === 'MEDIA' ? '#f59e0b' : '#3b82f6'}`, borderRadius: 3 }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 1 }}>
+                                        <Box>
+                                            <Typography variant="subtitle2" fontWeight={800} sx={{ color: isDone ? '#166534' : '#0f172a', textDecoration: isDone ? 'line-through' : 'none' }}>
+                                                {tarea.nombre}
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                                                Responsable: {tarea.responsable} 
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', gap: 1 }}>
+                                            <Chip size="small" label={tarea.estado} sx={{ fontWeight: 700, fontSize: '0.65rem', height: 20, bgcolor: isDone ? '#dcfce7' : tarea.estado === 'EN_PROGRESO' ? '#dbeafe' : '#f1f5f9', color: isDone ? '#166534' : tarea.estado === 'EN_PROGRESO' ? '#1e40af' : '#475569' }} />
+                                        </Box>
+                                    </Box>
+                                    
+                                    {tarea.informacion && (
+                                        <Typography variant="body2" sx={{ color: '#475569', mt: 1 }}>{tarea.informacion}</Typography>
+                                    )}
+                                    
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 2, pt: 1.5, borderTop: '1px dashed #e2e8f0' }}>
+                                        <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600 }}>
+                                            Fecha Límite: {new Date(`${tarea.fecha_limite}T00:00:00`).toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 700 }}>
+                                            Prioridad: {tarea.prioridad}
+                                        </Typography>
+                                    </Box>
+                                </Paper>
+                            );
+                        })}
+                      </Stack>
+                    ) : (
+                      <Box sx={{ textAlign: 'center', p: 6, bgcolor: '#fff', border: '1px solid #e2e8f0', borderRadius: 3 }}>
+                          <Assignment sx={{ fontSize: 48, color: '#cbd5e1', mb: 2 }} />
+                          <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#475569' }}>Agenda Limpia</Typography>
+                          <Typography variant="body2" sx={{ color: '#94a3b8' }}>No hay tareas vinculadas o pendientes para este cliente.</Typography>
+                      </Box>
+                    )}
+                </CustomTabPanel>
+                
+            </Box>
           </Box>
-        </Dialog>
-      )}
+        )}
+      </Drawer>
     </Box>
   );
 };

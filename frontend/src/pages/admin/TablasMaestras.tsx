@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { Add, Delete } from '@mui/icons-material';
 import api from '../../api/axios';
+import { showSuccess, showError, confirmAction } from '../../utils/alerts';
 
 // Interfaces para los datos
 interface MasterItem {
@@ -84,20 +85,23 @@ const TablasMaestras = () => {
           }
           setOpenModal(false); 
           setItemName('');
+          showSuccess(editItem ? 'Cambiado correctamente' : 'Creado correctamente');
           fetchData(); 
-      } catch (e) { alert("Error al guardar. Verifica que no esté duplicado."); }
+      } catch (e) { showError("Error", "Error al guardar. Verifica que no esté duplicado."); }
   };
 
   const handleDelete = async (type: MasterType, id: number) => {
-      if(!confirm("¿Estás seguro de eliminar este registro?")) return;
+      const isConfirmed = await confirmAction('¿Eliminar registro?', '¿Estás seguro de eliminar este registro?', 'Sí, eliminar');
+      if(!isConfirmed) return;
 
       const endpoint = `${masterEndpoints[type]}${id}/`;
       if (!endpoint) return;
 
       try {
           await api.delete(endpoint);
+          showSuccess('Registro eliminado');
           fetchData();
-      } catch (e) { alert("No se puede eliminar. Probablemente esté en uso por otro registro en el sistema."); }
+      } catch (e) { showError("No se pudo eliminar", "Probablemente esté en uso por otro registro en el sistema."); }
   };
 
   const MasterCard = ({ title, items, type }: { title: string, items: MasterItem[], type: MasterType }) => (

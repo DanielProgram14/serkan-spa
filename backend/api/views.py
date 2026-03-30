@@ -347,6 +347,7 @@ class AuditLogViewSet(AdminOnlyViewSet, viewsets.ReadOnlyModelViewSet):
 class ClienteViewSet(RoleContextMixin, viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
     serializer_class = ClienteSerializer
+    lookup_value_regex = '[^/]+'
 
     def get_queryset(self):
         role = self.get_user_role()
@@ -816,6 +817,7 @@ class MovimientoInventarioViewSet(RoleContextMixin, viewsets.ReadOnlyModelViewSe
 class TrabajadorViewSet(RoleContextMixin, viewsets.ModelViewSet):
     queryset = Trabajador.objects.all()
     serializer_class = TrabajadorSerializer
+    lookup_value_regex = '[^/]+'
 
     def get_queryset(self):
         role = self.get_user_role()
@@ -860,6 +862,62 @@ class TrabajadorViewSet(RoleContextMixin, viewsets.ModelViewSet):
                 'estado': 'No se puede eliminar un trabajador que se encuentra ACTIVO. Primero debe cambiarse su estado a INACTIVO.'
             })
         instance.delete()
+
+    @action(detail=True, methods=["get"], url_path="historial")
+    def historial(self, request, pk=None):
+        self.require_roles(ROLE_ADMINISTRADOR, ROLE_RRHH, ROLE_SUPERVISOR)
+        trabajador = self.get_object()
+        
+        historial = []
+        
+        # 1. Audit Logs (cambios al registro del trabajador)
+        logs = AuditLog.objects.filter(model="Trabajador", object_id=trabajador.rut).order_by("-timestamp")
+        for log in logs:
+            historial.append({
+                "fecha": log.timestamp.isoformat(),
+                "tipo": "SISTEMA",
+                "titulo": f"Registro {log.get_action_display().lower()}",
+                "descripcion": log.summary,
+                "usuario": log.user_label or (log.user.username if log.user else 'Sistema')
+            })
+            
+        # 2. Asignación de Herramientas
+        asignaciones = HerramientaAsignacion.objects.filter(trabajador=trabajador).select_related('herramienta', 'asignado_por').order_by("-fecha_asignacion")
+        for asig in asignaciones:
+            historial.append({
+                "fecha": asig.fecha_asignacion.isoformat(),
+                "tipo": "HERRAMIENTA",
+                "titulo": f"Asignación de herramienta: {asig.herramienta.nombre}",
+                "descripcion": f"Cantidad: {asig.cantidad}. Estado: {asig.estado}",
+                "usuario": asig.asignado_por.username if asig.asignado_por else 'Sistema'
+            })
+            
+        # 3. Tareas asignadas
+        tareas = Tarea.objects.filter(responsable=trabajador).order_by("-fecha_creacion")
+        for tarea in tareas:
+            historial.append({
+                "fecha": tarea.fecha_creacion.isoformat(),
+                "tipo": "TAREA",
+                "titulo": f"Tarea asignada: {tarea.nombre}",
+                "descripcion": f"Prioridad: {tarea.prioridad}. Estado: {tarea.estado}",
+                "usuario": tarea.creado_por
+            })
+            
+        # 4. Eventos asignados
+        eventos = Evento.objects.filter(trabajadores_asignados=trabajador).order_by("-created_at")
+        for evento in eventos:
+            historial.append({
+                "fecha": evento.created_at.isoformat(),
+                "tipo": "EVENTO",
+                "titulo": f"Evento asignado: {evento.titulo}",
+                "descripcion": f"Fecha: {evento.fecha}. Tipo: {evento.tipo}",
+                "usuario": evento.creado_por.username
+            })
+            
+        # Ordenar todo cronológicamente descendente
+        historial.sort(key=lambda x: x["fecha"], reverse=True)
+        
+        return Response(historial)
 
 
 class DocumentoViewSet(RoleContextMixin, viewsets.ModelViewSet):

@@ -106,7 +106,8 @@ const Dashboard = () => {
 
   // Estadísticas
   const [docStats, setDocStats] = useState({ vencidos: 0, porVencer: 0, total: 0 });
-  const [taskStats, setTaskStats] = useState({ vencidas: 0, proximas: 0, pendientes: 0 });
+  const [taskStats, setTaskStats] = useState({ vencidas: 0, proximas: 0, pendientes: 0, enProgreso: 0, completadas: 0, total: 0 });
+  const [workersLoad, setWorkersLoad] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
 
   // Nuevos estados para Inventario y Órdenes
@@ -173,17 +174,27 @@ const Dashboard = () => {
         });
         setDocStats({ vencidos: dVencidos, porVencer: dPorVencer, total: docs.length });
 
-        // 2. CÁLCULOS TAREAS
+        // 2. CÁLCULOS TAREAS Y CARGA LABORAL
         let tVencidas = 0;
         let tProximas = 0;
         let tPendientes = 0;
+        let tEnProgreso = 0;
+        let tCompletadas = 0;
         let tasksUrgentes: any[] = [];
+        const workloadMap: Record<string, number> = {};
+
         tasks.forEach((t: any) => {
-          if (t.estado === 'PENDIENTE') {
-            tPendientes++;
+          let hasExpired = false;
+
+          // Calcular vencidas y próximas solo si no están completadas o canceladas
+          if (t.estado !== 'COMPLETADA' && t.estado !== 'CANCELADA') {
             const f = new Date(t.fecha_limite + 'T00:00:00');
             const diff = Math.ceil((f.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-            if (diff < 0) tVencidas++;
+            
+            if (diff < 0) {
+              tVencidas++;
+              hasExpired = true;
+            }
             else if (diff >= 0 && diff <= 7) tProximas++;
 
             // Tareas urgentes (prioridad alta y próximas a vencer en 3 días)
@@ -191,8 +202,38 @@ const Dashboard = () => {
               tasksUrgentes.push(t);
             }
           }
+
+          if (t.estado === 'COMPLETADA') {
+            tCompletadas++;
+          } else if (t.estado === 'PENDIENTE') {
+            if (!hasExpired) tPendientes++;
+          } else if (t.estado === 'EN_PROGRESO') {
+            if (!hasExpired) tEnProgreso++;
+          }
+
+          // Calcular carga laboral por trabajador (agrupando tareas activas)
+          if (t.estado !== 'COMPLETADA' && t.estado !== 'CANCELADA' && t.nombre_responsable) {
+            workloadMap[t.nombre_responsable] = (workloadMap[t.nombre_responsable] || 0) + 1;
+          }
         });
-        setTaskStats({ vencidas: tVencidas, proximas: tProximas, pendientes: tPendientes });
+
+        setTaskStats({ 
+          vencidas: tVencidas, proximas: tProximas, 
+          pendientes: tPendientes, enProgreso: tEnProgreso, completadas: tCompletadas,
+          total: tasks.length 
+        });
+
+        const workersData = Object.keys(workloadMap).map(name => {
+          const parts = name.split(' ');
+          const shortName = parts[0] + (parts.length > 1 ? ' ' + parts[1].charAt(0) + '.' : '');
+          return {
+            name: shortName,
+            tareas: workloadMap[name],
+            fullName: name
+          };
+        }).sort((a, b) => b.tareas - a.tareas);
+
+        setWorkersLoad(workersData);
 
         // 3. CÁLCULOS INVENTARIO - PRODUCTOS
         let bajoStock = 0;
@@ -666,31 +707,62 @@ const Dashboard = () => {
         {canSeeAllTasks() ? 'Estado de Tareas (Todas)' : 'Mis Tareas'}
       </Typography>
 
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} sx={{ mb: 5 }}>
-        <KpiCard
-          title="TAREAS ATRASADAS"
-          value={taskStats.vencidas}
-          borderColor="#ef4444"
-          color={{ bg: '#fee2e2', text: '#ef4444' }}
-          icon={<Schedule />}
-          badge={taskStats.vencidas > 0 ? taskStats.vencidas : null}
-        />
-        <KpiCard
-          title="PARA ESTA SEMANA"
-          value={taskStats.proximas}
-          borderColor="#eab308"
-          color={{ bg: '#fef9c3', text: '#eab308' }}
-          icon={<Timeline />}
-          badge={taskStats.proximas > 0 ? taskStats.proximas : null}
-        />
-        <KpiCard
-          title="TOTAL PENDIENTES"
-          value={taskStats.pendientes}
-          borderColor="#10b981"
-          color={{ bg: '#d1fae5', text: '#10b981' }}
-          icon={<Assignment />}
-        />
+      <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} sx={{ mb: 3 }}>
+        <KpiCard title="PENDIENTES" value={taskStats.pendientes} borderColor="#f59e0b" color={{ bg: '#fef3c7', text: '#f59e0b' }} icon={<Assignment />} />
+        <KpiCard title="EN PROGRESO" value={taskStats.enProgreso} borderColor="#3b82f6" color={{ bg: '#dbeafe', text: '#3b82f6' }} icon={<Timeline />} />
+        <KpiCard title="COMPLETADAS" value={taskStats.completadas} borderColor="#10b981" color={{ bg: '#d1fae5', text: '#10b981' }} icon={<CheckCircle />} />
+        <KpiCard title="ATRASADAS" value={taskStats.vencidas} borderColor="#ef4444" color={{ bg: '#fee2e2', text: '#ef4444' }} icon={<Schedule />} badge={taskStats.vencidas > 0 ? taskStats.vencidas : null} />
       </Stack>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3, mb: 5 }}>
+        <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 3, bgcolor: '#ffffff' }}>
+          <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 3, color: '#0f172a' }}>Distribución del Estado Global</Typography>
+          <Box sx={{ width: '100%', height: 260 }}>
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie 
+                  data={[
+                    { name: 'Pendientes (Al día)', value: taskStats.pendientes },
+                    { name: 'En Progreso', value: taskStats.enProgreso },
+                    { name: 'Completadas', value: taskStats.completadas },
+                    { name: 'Atrasadas', value: taskStats.vencidas }
+                  ].filter(d => d.value > 0)} 
+                  cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value"
+                >
+                  {[{ name: 'Pendientes (Al día)', value: taskStats.pendientes, color: '#f59e0b' },
+                    { name: 'En Progreso', value: taskStats.enProgreso, color: '#3b82f6' },
+                    { name: 'Completadas', value: taskStats.completadas, color: '#10b981' },
+                    { name: 'Atrasadas', value: taskStats.vencidas, color: '#ef4444' }
+                  ].filter(d => d.value > 0).map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ResponsiveContainer>
+          </Box>
+        </Paper>
+
+        <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 3, bgcolor: '#ffffff' }}>
+          <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 3, color: '#0f172a' }}>Carga Laboral por Trabajador (Tareas Activas)</Typography>
+          <Box sx={{ width: '100%', height: 260 }}>
+            {workersLoad.length > 0 ? (
+              <ResponsiveContainer>
+                <BarChart data={workersLoad} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} allowDecimals={false} />
+                  <RechartsTooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                  <Bar dataKey="tareas" name="Tareas Asignadas" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 10 }}>No hay tareas activas asignadas a ningún trabajador.</Typography>
+            )}
+          </Box>
+        </Paper>
+      </Box>
 
       {/* --- SECCIÓN 3: GESTIÓN DE INVENTARIO - Solo para ADMINISTRADOR, RRHH, SUPERVISOR --- */}
       {canSeeInventory() && (

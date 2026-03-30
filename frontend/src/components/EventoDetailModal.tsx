@@ -13,10 +13,6 @@ import {
   Paper,
   CircularProgress,
   Alert,
-  Avatar,
-  AvatarGroup,
-  useMediaQuery,
-  useTheme,
 } from '@mui/material';
 import {
   Schedule,
@@ -28,6 +24,7 @@ import {
   Flag,
 } from '@mui/icons-material';
 import api from '../api/axios';
+import { confirmAction } from '../utils/alerts';
 
 interface Evento {
   id: number;
@@ -382,7 +379,8 @@ const EventoDetailModal: React.FC<EventoDetailModalProps> = ({
         {onDelete && evento && (
           <Button
             onClick={async () => {
-              if (window.confirm('¿Estás seguro de que deseas eliminar este evento?')) {
+              const isConfirmed = await confirmAction('¿Eliminar evento?', '¿Estás seguro de que deseas eliminar este evento?', 'Sí, eliminar');
+              if (isConfirmed) {
                 setDeleting(true);
                 try {
                   await onDelete(evento.id);

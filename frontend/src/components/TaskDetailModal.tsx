@@ -27,6 +27,7 @@ import {
   Business,
 } from '@mui/icons-material';
 import api from '../api/axios';
+import { confirmAction } from '../utils/alerts';
 
 interface Tarea {
   id: number;
@@ -363,8 +364,9 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         )}
         {onDelete && task && (
           <Button
-            onClick={() => {
-              if (window.confirm('¿Estás seguro de que deseas eliminar esta tarea?')) {
+            onClick={async () => {
+              const isConfirmed = await confirmAction('¿Eliminar tarea?', '¿Estás seguro de que deseas eliminar esta tarea?', 'Sí, eliminar');
+              if (isConfirmed) {
                 onDelete(task.id);
                 onClose();
               }
