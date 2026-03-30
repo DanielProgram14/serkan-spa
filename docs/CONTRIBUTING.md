@@ -72,6 +72,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
 - **Nombres**: `camelCase` para variables/funciones, `PascalCase` para componentes/tipos
 - **Tipos**: Siempre especificar tipos explícitos
 - **Componentes**: Usar arrow functions con `React.FC<Props>`
+- **Notificaciones**: Se prohíbe el uso de `alert()` o `confirm()`. Usa siempre los métodos de `src/utils/alerts.ts` (ej. `showSuccess()`, `confirmAction()`).
 
 Ejemplo:
 ```typescript
@@ -272,4 +273,4 @@ npm run dev -- --port 3000
 
 ---
 
-**Última actualización**: 11 de marzo de 2026
+**Última actualización**: 30 de marzo de 2026

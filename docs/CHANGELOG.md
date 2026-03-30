@@ -4,6 +4,26 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.1.0] - 2026-03-30
+
+### 🚀 Novedades y Mejoras UX/UI
+
+#### ✨ Dashboard y Analytics
+- **Dashboard Analítico Implementado**: Incorporación completa de gráficos interactivos usando `recharts` (Gráfico Circular para estado global de tareas y Gráfico de Barras para carga laboral).
+- **Métricas Expandidas**: Separación del cálculo estadístico de las tareas en *Pendientes (Al día)*, *En Progreso*, *Atrasadas* y *Completadas*. 
+- **Gestión Visual**: KPIs (Tarjetas) rediseñadas.
+
+#### 🎨 Rediseño del Módulo de Clientes
+- **Panel Lateral (Drawer)**: Se eliminó el panel inferior obsoleto y se reemplazó por un moderno Drawer deslizable que superpone la interfaz.
+- **Pestañas Integradas (Tabs)**: Información del cliente desglosada en Resumen, Documentación, Finanzas y Tareas para evitar carga visual.
+- **Correcciones de Z-Index**: Solucionados problemas de conflictos de capas visuales entre el Panel Lateral y los menús desplegables del sistema.
+
+#### 🔔 Sistema de Notificaciones Global
+- **Migración a SweetAlert2**: Se eliminaron completamente las alertas nativas de navegador (`alert()`, `confirm()`).
+- **Helpers Centralizados**: Implementación de `alerts.ts` para manejar avisos de éxito, error, advertencia y confirmación de borrado en toda la SPA de forma nativa.
+
+---
+
 ## [1.0.0] - 2026-03-11
 
 ### 🎉 Publicación Inicial - Versión Lista para Producción
@@ -117,7 +137,7 @@ Si tienes una instalación anterior del proyecto:
 - [ ] Sistema de notificaciones por email
 - [ ] API GraphQL alternativa
 - [ ] Mobile app (React Native)
-- [ ] Dashboard de analytics
+- [x] Dashboard de analytics
 - [ ] Sistema de auditoría completo
 - [ ] Integración con sistemas externos (ERP, CRM)
 - [ ] Soporte multiidioma en frontend
@@ -125,6 +145,6 @@ Si tienes una instalación anterior del proyecto:
 
 ---
 
-**Fecha**: 11 de marzo de 2026
-**Versión**: 1.0.0
-**Estado**: ✅ Listo para producción
+**Fecha**: 30 de marzo de 2026
+**Versión**: 1.1.0
+**Estado**: ✅ En desarrollo activo
