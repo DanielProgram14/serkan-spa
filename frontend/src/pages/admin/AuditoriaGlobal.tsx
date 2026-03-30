@@ -20,6 +20,8 @@ import {
   TableRow,
   TextField,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
@@ -153,6 +155,8 @@ const formatValue = (value: unknown) => {
 };
 
 const AuditoriaGlobal = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [filters, setFilters] = useState({ ...emptyFilters });
   const [appliedFilters, setAppliedFilters] = useState({ ...emptyFilters });
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -487,9 +491,9 @@ const AuditoriaGlobal = () => {
       </Paper>
 
       <Dialog 
-        open={Boolean(selected)} 
+        open={Boolean(selected)} fullScreen={isMobile} 
         onClose={() => setSelected(null)} 
-        maxWidth="md" 
+        fullScreen={isMobile} maxWidth="md" 
         fullWidth
         PaperProps={{
           sx: { borderRadius: 3, p: 1 }

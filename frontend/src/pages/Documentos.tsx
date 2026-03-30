@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { 
   Box, Typography, Button, Paper, TextField, MenuItem, Stack, 
-  Dialog, DialogContent, DialogActions, Chip, InputAdornment, Avatar, IconButton, Tooltip, Alert
+  Dialog, DialogContent, DialogActions, Chip, InputAdornment, Avatar, IconButton, Tooltip, Alert,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
@@ -55,6 +57,8 @@ const getFileColor = (filename: string) => {
 };
 
 const Documentos = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { user } = useAuth();
   const canManageDocuments = user?.rol === 'ADMINISTRADOR' || user?.rol === 'RRHH';
 
@@ -316,7 +320,7 @@ const handleDelete = async (id: number) => {
       </Paper>
 
       {/* MODAL SUBIDA */}
-      <Dialog open={open && canManageDocuments} onClose={() => setOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+      <Dialog open={open && canManageDocuments} onClose={() => setOpen(false)} fullScreen={isMobile} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <Box sx={{ p: 3, bgcolor: '#f8fafc', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between' }}>
             <Box>
                 <Typography variant="h6" fontWeight="bold">Subir Documento</Typography>

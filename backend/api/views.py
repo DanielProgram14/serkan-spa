@@ -436,11 +436,7 @@ class ProductoViewSet(RoleContextMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         self.require_roles(ROLE_ADMINISTRADOR, ROLE_RRHH, ROLE_SUPERVISOR)
-        # Establecer stock_disponible igual a stock_total en creación
-        herramienta = serializer.save()
-        if herramienta.stock_disponible != herramienta.stock_total:
-            herramienta.stock_disponible = herramienta.stock_total
-            herramienta.save(update_fields=["stock_disponible"])
+        serializer.save()
 
     def perform_update(self, serializer):
         self.require_roles(ROLE_ADMINISTRADOR, ROLE_RRHH, ROLE_SUPERVISOR)

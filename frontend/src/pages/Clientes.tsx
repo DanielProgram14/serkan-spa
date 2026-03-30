@@ -15,6 +15,8 @@ import {
   TextField,
   Tooltip,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
@@ -121,6 +123,8 @@ const formatApiError = (error: unknown) => {
 };
 
 const Clientes = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { user } = useAuth();
   const canManageClientes = user?.rol === 'ADMINISTRADOR' || user?.rol === 'RRHH';
   const canCreateDocs = ['ADMINISTRADOR', 'RRHH', 'SUPERVISOR'].includes(user?.rol ?? '');
@@ -473,7 +477,7 @@ const Clientes = () => {
 
       {!selected && !loadingClientes && <Alert severity="info" sx={{ mt: 2 }}>No hay clientes para mostrar.</Alert>}
 
-      <Dialog open={openCliente && canManageClientes} onClose={() => setOpenCliente(false)} maxWidth="sm" fullWidth>
+      <Dialog open={openCliente && canManageClientes} onClose={() => setOpenCliente(false)} fullScreen={isMobile} maxWidth="sm" fullWidth>
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee' }}>
           <Typography variant="h6">{isEdit ? 'Editar Cliente' : 'Nuevo Cliente'}</Typography>
           <IconButton onClick={() => setOpenCliente(false)}><Close /></IconButton>
@@ -495,7 +499,7 @@ const Clientes = () => {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openDoc && canCreateDocs} onClose={() => setOpenDoc(false)} maxWidth="sm" fullWidth>
+      <Dialog open={openDoc && canCreateDocs} onClose={() => setOpenDoc(false)} fullScreen={isMobile} maxWidth="sm" fullWidth>
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee' }}>
           <Typography variant="h6">Cargar documento</Typography>
           <IconButton onClick={() => setOpenDoc(false)}><Close /></IconButton>
@@ -518,7 +522,7 @@ const Clientes = () => {
 
       {/* === MODAL: FICHA COMPLETA DEL CLIENTE === */}
       {fichaCliente && (
-        <Dialog open={openFicha} onClose={() => setOpenFicha(false)} maxWidth="lg" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <Dialog open={openFicha} onClose={() => setOpenFicha(false)} fullScreen={isMobile} maxWidth="lg" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
           {/* ENCABEZADO */}
           <Box sx={{ bgcolor: '#0f172a', color: 'white', p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box>

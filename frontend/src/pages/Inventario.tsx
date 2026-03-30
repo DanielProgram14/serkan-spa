@@ -21,8 +21,11 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Grid,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
-import { DataGrid } from '@mui/x-data-grid';
+import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
 import {
   Add,
@@ -126,6 +129,8 @@ const emptyDiscountForm = () => ({ cantidad: '1', detalle: '' });
 
 const Inventario = () => {
   const { user } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const canManage = ['ADMINISTRADOR', 'RRHH', 'SUPERVISOR'].includes(user?.rol ?? '');
   const canConfirm = ['ADMINISTRADOR', 'RRHH'].includes(user?.rol ?? '');
   const canEdit = ['ADMINISTRADOR', 'RRHH'].includes(user?.rol ?? ''); // Solo Admin y RRHH pueden editar
@@ -235,7 +240,11 @@ const Inventario = () => {
     return herramientas.filter((h) => h.codigo.toLowerCase().includes(q) || h.nombre.toLowerCase().includes(q));
   }, [herramientas, qHerramienta]);
 
+  const totalProductos = useMemo(() => productos.length, [productos]);
   const lowStockCount = useMemo(() => productos.filter((p) => Number(p.stock_actual) <= Number(p.stock_minimo)).length, [productos]);
+  const herramientasAsignadasCount = useMemo(() => herramientas.filter((h) => h.estado === 'ASIGNADA').length, [herramientas]);
+  const ordenesPendientesCount = useMemo(() => ordenes.filter((o) => o.estado === 'BORRADOR' || (o.estado === 'CONFIRMADA' && !o.fecha_confirmacion)).length, [ordenes]);
+
   const asignacionesVisibles = useMemo(() => {
     if (user?.rol !== 'TRABAJADOR' || !user?.trabajador_rut) return asignaciones;
     return asignaciones.filter((a) => a.trabajador === user.trabajador_rut);
@@ -614,8 +623,64 @@ const Inventario = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
+      {/* Panel de Métricas (KPIs) */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card sx={{ bgcolor: '#eff6ff', borderLeft: '4px solid #3b82f6', height: '100%', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box>
+                  <Typography color="text.secondary" variant="caption" fontWeight="bold">TOTAL PRODUCTOS</Typography>
+                  <Typography variant="h4" fontWeight="900" color="#1e3a8a">{totalProductos}</Typography>
+                </Box>
+                <Warehouse fontSize="large" sx={{ color: '#60a5fa' }} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card sx={{ bgcolor: lowStockCount > 0 ? '#fef2f2' : '#f0fdf4', borderLeft: `4px solid ${lowStockCount > 0 ? '#ef4444' : '#22c55e'}`, height: '100%', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box>
+                  <Typography color="text.secondary" variant="caption" fontWeight="bold">STOCK CRÍTICO</Typography>
+                  <Typography variant="h4" fontWeight="900" color={lowStockCount > 0 ? '#991b1b' : '#166534'}>{lowStockCount}</Typography>
+                </Box>
+                {lowStockCount > 0 ? <WarningAmber fontSize="large" sx={{ color: '#f87171' }} /> : <CheckCircle fontSize="large" sx={{ color: '#4ade80' }} />}
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card sx={{ bgcolor: '#fdf4ff', borderLeft: '4px solid #d946ef', height: '100%', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box>
+                  <Typography color="text.secondary" variant="caption" fontWeight="bold">HERR. ASIGNADAS</Typography>
+                  <Typography variant="h4" fontWeight="900" color="#701a75">{herramientasAsignadasCount}</Typography>
+                </Box>
+                <Handyman fontSize="large" sx={{ color: '#e879f9' }} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card sx={{ bgcolor: ordenesPendientesCount > 0 ? '#fffbeb' : '#f8fafc', borderLeft: `4px solid ${ordenesPendientesCount > 0 ? '#f59e0b' : '#94a3b8'}`, height: '100%', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box>
+                  <Typography color="text.secondary" variant="caption" fontWeight="bold">ÓRDENES EN TRÁNSITO</Typography>
+                  <Typography variant="h4" fontWeight="900" color={ordenesPendientesCount > 0 ? '#b45309' : '#334155'}>{ordenesPendientesCount}</Typography>
+                </Box>
+                <ShoppingCart fontSize="large" sx={{ color: ordenesPendientesCount > 0 ? '#fbbf24' : '#cbd5e1' }} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
       <Paper sx={{ p: 1, mb: 2 }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)}>
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
           <Tab label={`Productos (${productos.length})`} />
           <Tab label={`Herramientas (${herramientas.length})`} />
           <Tab label={`Ordenes (${ordenes.length})`} />
@@ -641,7 +706,7 @@ const Inventario = () => {
               </Stack>
             )}
           </Box>
-          <Box sx={{ height: 440 }}><DataGrid rows={productosFiltrados} columns={productColumns} loading={loading} /></Box>
+          <Box sx={{ height: 440 }}><DataGrid rows={productosFiltrados} columns={productColumns} loading={loading} slots={{ toolbar: GridToolbar }} getRowClassName={(params) => params.row.stock_actual <= params.row.stock_minimo ? 'low-stock-row' : ''} sx={{ '& .low-stock-row': { bgcolor: '#fef2f2', '&:hover': { bgcolor: '#fee2e2' } } }} /></Box>
         </Paper>
       )}
 
@@ -652,7 +717,7 @@ const Inventario = () => {
             <Typography variant="h6">Herramientas</Typography>
             {canManage && <Button variant="contained" startIcon={<Add />} onClick={openCreateHerramienta}>Nueva herramienta</Button>}
           </Box>
-          <Box sx={{ height: 470 }}><DataGrid rows={herramientasFiltradas} columns={toolColumns} loading={loading} /></Box>
+          <Box sx={{ height: 470 }}><DataGrid rows={herramientasFiltradas} columns={toolColumns} loading={loading} slots={{ toolbar: GridToolbar }} /></Box>
         </Paper>
       )}
 
@@ -667,7 +732,7 @@ const Inventario = () => {
               </Stack>
             )}
           </Box>
-          <Box sx={{ height: 360 }}><DataGrid rows={ordenes} columns={orderColumns} loading={loading} /></Box>
+          <Box sx={{ height: 360 }}><DataGrid rows={ordenes} columns={orderColumns} loading={loading} slots={{ toolbar: GridToolbar }} /></Box>
           <Box sx={{ mt: 2 }}>
             <Typography variant="h6" sx={{ mb: 1 }}>Proveedores</Typography>
             <Box sx={{ height: 280 }}><DataGrid rows={proveedores} columns={proveedorColumns} loading={loading} /></Box>
@@ -678,10 +743,10 @@ const Inventario = () => {
       {tab === 3 && canViewMovements && (
         <Paper sx={{ p: 2 }}>
           <Typography variant="h6" sx={{ mb: 1 }}>Movimientos inventario</Typography>
-          <Box sx={{ height: 400 }}><DataGrid rows={movimientos} columns={movColumns} loading={loading} /></Box>
+          <Box sx={{ height: 400 }}><DataGrid rows={movimientos} columns={movColumns} loading={loading} slots={{ toolbar: GridToolbar }} /></Box>
         </Paper>
       )}
-      <Dialog open={openProducto && canManage} onClose={() => setOpenProducto(false)} maxWidth="sm" fullWidth>
+      <Dialog open={openProducto && canManage} onClose={() => setOpenProducto(false)} fullScreen={isMobile} maxWidth="sm" fullWidth>
         <DialogTitle>{editingProducto ? 'Editar producto' : 'Nuevo producto'}</DialogTitle>
         <DialogContent>
           <Stack spacing={1.2} sx={{ mt: 1 }}>
@@ -706,7 +771,7 @@ const Inventario = () => {
         <DialogActions><Button onClick={() => setOpenProducto(false)}>Cancelar</Button><Button variant="contained" onClick={() => void saveProducto()}>Guardar</Button></DialogActions>
       </Dialog>
 
-      <Dialog open={openHerramienta && canManage} onClose={() => setOpenHerramienta(false)} maxWidth="sm" fullWidth>
+      <Dialog open={openHerramienta && canManage} onClose={() => setOpenHerramienta(false)} fullScreen={isMobile} maxWidth="sm" fullWidth>
         <DialogTitle>{editingHerramienta ? 'Editar herramienta' : 'Nueva herramienta'}</DialogTitle>
         <DialogContent>
           <Stack spacing={1.2} sx={{ mt: 1 }}>
@@ -723,7 +788,7 @@ const Inventario = () => {
         <DialogActions><Button onClick={() => setOpenHerramienta(false)}>Cancelar</Button><Button variant="contained" onClick={() => void saveHerramienta()}>Guardar</Button></DialogActions>
       </Dialog>
 
-      <Dialog open={openCategoria && canManage} onClose={() => setOpenCategoria(false)} maxWidth="xs" fullWidth>
+      <Dialog open={openCategoria && canManage} onClose={() => setOpenCategoria(false)} fullScreen={isMobile} maxWidth="xs" fullWidth>
         <DialogTitle>Nueva categoría</DialogTitle>
         <DialogContent>
           <TextField
@@ -740,7 +805,7 @@ const Inventario = () => {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openProveedor && canManage} onClose={closeProveedorDialog} maxWidth="sm" fullWidth>
+      <Dialog open={openProveedor && canManage} onClose={closeProveedorDialog} fullScreen={isMobile} maxWidth="sm" fullWidth>
         <DialogTitle>{editingProveedor ? 'Editar proveedor' : 'Nuevo proveedor'}</DialogTitle>
         <DialogContent>
           <Stack spacing={1.2} sx={{ mt: 1 }}>
@@ -754,7 +819,7 @@ const Inventario = () => {
         <DialogActions><Button onClick={closeProveedorDialog}>Cancelar</Button><Button variant="contained" onClick={() => void saveProveedor()}>Guardar</Button></DialogActions>
       </Dialog>
 
-      <Dialog open={openOrden && canManage} onClose={() => setOpenOrden(false)} maxWidth="md" fullWidth>
+      <Dialog open={openOrden && canManage} onClose={() => setOpenOrden(false)} fullScreen={isMobile} maxWidth="md" fullWidth>
         <DialogTitle>Nueva orden</DialogTitle>
         <DialogContent>
           <Stack spacing={1.2} sx={{ mt: 1 }}>
@@ -774,7 +839,7 @@ const Inventario = () => {
         </DialogContent>
         <DialogActions><Button onClick={() => setOpenOrden(false)}>Cancelar</Button><Button variant="contained" onClick={() => void saveOrden()}>Crear</Button></DialogActions>
       </Dialog>
-      <Dialog open={openDetalleProducto} onClose={() => setOpenDetalleProducto(false)} maxWidth="sm" fullWidth>
+      <Dialog open={openDetalleProducto} onClose={() => setOpenDetalleProducto(false)} fullScreen={isMobile} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Warehouse sx={{ color: 'primary.main' }} />
           Detalle de Producto
@@ -873,7 +938,7 @@ const Inventario = () => {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openDescuento && canManage} onClose={() => setOpenDescuento(false)} maxWidth="xs" fullWidth>
+      <Dialog open={openDescuento && canManage} onClose={() => setOpenDescuento(false)} fullScreen={isMobile} maxWidth="xs" fullWidth>
         <DialogTitle>Descontar stock</DialogTitle>
         <DialogContent>
           <Stack spacing={1.2} sx={{ mt: 1 }}>
@@ -886,7 +951,7 @@ const Inventario = () => {
         <DialogActions><Button onClick={() => setOpenDescuento(false)}>Cancelar</Button><Button variant="contained" color="warning" onClick={() => void descontarStock()}>Descontar</Button></DialogActions>
       </Dialog>
 
-      <Dialog open={openDetalleHerramienta} onClose={() => setOpenDetalleHerramienta(false)} maxWidth="sm" fullWidth>
+      <Dialog open={openDetalleHerramienta} onClose={() => setOpenDetalleHerramienta(false)} fullScreen={isMobile} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Handyman sx={{ color: 'primary.main' }} />
           Detalle de Herramienta
@@ -1047,7 +1112,7 @@ const Inventario = () => {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openAsignar && canManage} onClose={() => setOpenAsignar(false)} maxWidth="sm" fullWidth>
+      <Dialog open={openAsignar && canManage} onClose={() => setOpenAsignar(false)} fullScreen={isMobile} maxWidth="sm" fullWidth>
         <DialogTitle>Asignar herramienta a trabajador</DialogTitle>
         <DialogContent>
           <Stack spacing={1.2} sx={{ mt: 1 }}>
@@ -1061,7 +1126,7 @@ const Inventario = () => {
         <DialogActions><Button onClick={() => setOpenAsignar(false)}>Cancelar</Button><Button variant="contained" onClick={() => void asignarHerramienta()}>Asignar</Button></DialogActions>
       </Dialog>
 
-      <Dialog open={openDetalleOrden} onClose={() => setOpenDetalleOrden(false)} maxWidth="md" fullWidth>
+      <Dialog open={openDetalleOrden} onClose={() => setOpenDetalleOrden(false)} fullScreen={isMobile} maxWidth="md" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <ShoppingCart sx={{ color: 'primary.main' }} />
           Detalle de Orden de Compra

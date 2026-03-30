@@ -15,6 +15,8 @@ import {
   Alert,
   Avatar,
   AvatarGroup,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Schedule,

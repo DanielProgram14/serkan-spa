@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { 
   Box, Typography, Paper, Button, Chip, Stack, Dialog, Alert,
-  DialogTitle, DialogContent, TextField, DialogActions, Tooltip 
+  DialogTitle, DialogContent, TextField, DialogActions, Tooltip ,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { Add, Delete } from '@mui/icons-material';
 import api from '../../api/axios';
@@ -23,6 +25,8 @@ const masterEndpoints: Record<MasterType, string> = {
 };
 
 const TablasMaestras = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [areas, setAreas] = useState<MasterItem[]>([]);
   const [cargos, setCargos] = useState<MasterItem[]>([]);
   const [docs, setDocs] = useState<MasterItem[]>([]);
@@ -169,7 +173,7 @@ const TablasMaestras = () => {
         </Stack>
 
         {/* MODAL UNIFICADO */}
-        <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <Dialog open={openModal} onClose={() => setOpenModal(false)} fullScreen={isMobile} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
             <DialogTitle fontWeight="bold" sx={{ borderBottom: '1px solid #f1f5f9' }}>
                 {editItem ? 'Editar Registro' : 'Nuevo Registro'}
             </DialogTitle>

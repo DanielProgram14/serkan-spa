@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { 
     Box, Typography, Button, Paper, Table, TableBody, TableCell, TableHead, TableRow, 
     Chip, IconButton, Dialog, DialogContent, Stack, TextField, MenuItem, Alert, 
-    DialogTitle, DialogActions, Avatar, CircularProgress 
+    DialogTitle, DialogActions, Avatar, CircularProgress ,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { Add, Visibility, DeleteOutline, Person } from '@mui/icons-material';
 import api from '../../api/axios';
@@ -26,6 +28,8 @@ interface Worker {
 }
 
 const CuentasUsuarios = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const [users, setUsers] = useState<User[]>([]);
     const [workers, setWorkers] = useState<Worker[]>([]);
     const [error, setError] = useState('');
@@ -172,7 +176,7 @@ const CuentasUsuarios = () => {
             </Paper>
 
             {/* MODAL CREAR */}
-            <Dialog open={openCreate} onClose={() => setOpenCreate(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+            <Dialog open={openCreate} onClose={() => setOpenCreate(false)} fullScreen={isMobile} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
                 <DialogContent sx={{ p: 4 }}>
                     <Typography variant="h6" fontWeight="900" sx={{ mb: 3 }}>Nuevo Acceso de Sistema</Typography>
                     <Stack spacing={3}>
@@ -228,7 +232,7 @@ const CuentasUsuarios = () => {
             </Dialog>
 
             {/* MODAL DETALLE */}
-            <Dialog open={openDetail} onClose={() => setOpenDetail(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+            <Dialog open={openDetail} onClose={() => setOpenDetail(false)} fullScreen={isMobile} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
                 {selectedUser && (
                     <>
                         <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>

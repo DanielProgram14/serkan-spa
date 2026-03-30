@@ -22,7 +22,10 @@ import {
   TextField,
   InputAdornment,
   DialogActions,
-  Alert
+  Alert,
+  Drawer,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { 
   KeyboardArrowDown, 
@@ -36,7 +39,8 @@ import {
   Edit,
   VpnKey,
   Save,
-  ArrowBack
+  ArrowBack,
+  Menu as MenuIcon
 } from '@mui/icons-material';
 
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
@@ -51,11 +55,14 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 
 const Navbar = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, login } = useAuth();
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [openProfile, setOpenProfile] = useState(false);
   
   // Edición de perfil
@@ -155,7 +162,18 @@ const Navbar = () => {
             SERKAN SPA
           </Typography>
 
-          <Box sx={{ flexGrow: 1, display: 'flex', gap: 0.5 }}>
+          {/* Mobile Hamburger Icon */}
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={() => setMobileOpen(true)}
+            sx={{ display: { md: 'none' }, color: '#0f172a' }}
+          >
+            <MenuIcon />
+          </IconButton>
+
+          {/* Desktop Nav Items */}
+          <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, gap: 0.5 }}>
             {filteredItems.map((item) => {
               const isActive = location.pathname.startsWith(item.path);
               return (
@@ -229,11 +247,46 @@ const Navbar = () => {
         </Toolbar>
       </Container>
 
+      {/* MOBILE DRAWER */}
+      <Drawer
+        anchor="left"
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        PaperProps={{ sx: { width: 280, bgcolor: '#f8fafc' } }}
+      >
+        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0' }}>
+          <Typography variant="h6" fontWeight="bold" color="#0f172a">SERKAN SPA</Typography>
+          <IconButton onClick={() => setMobileOpen(false)}><Close /></IconButton>
+        </Box>
+        <List sx={{ px: 2, py: 2 }}>
+          {filteredItems.map((item) => {
+            const isActive = location.pathname.startsWith(item.path);
+            return (
+              <ListItem 
+                key={item.label} 
+                onClick={() => { navigate(item.path); setMobileOpen(false); }}
+                sx={{
+                  mb: 1,
+                  borderRadius: 2,
+                  bgcolor: isActive ? '#eff6ff' : 'transparent',
+                  color: isActive ? '#2563eb' : '#475569',
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: '#f1f5f9' }
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 40, color: isActive ? '#2563eb' : '#94a3b8' }}>{item.icon}</ListItemIcon>
+                <ListItemText primary={<Typography fontWeight={isActive ? 'bold' : '500'}>{item.label}</Typography>} />
+              </ListItem>
+            );
+          })}
+        </List>
+      </Drawer>
+
       {/* MODAL MI PERFIL REDISEÑADO CON EDICIÓN */}
       <Dialog 
-        open={openProfile} 
+        open={openProfile} fullScreen={isMobile} 
         onClose={() => setOpenProfile(false)} 
-        maxWidth="xs" 
+        fullScreen={isMobile} maxWidth="xs" 
         fullWidth
         PaperProps={{ sx: { borderRadius: 4, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' } }}
       >

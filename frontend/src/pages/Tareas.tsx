@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { 
   Box, Typography, Button, Paper, TextField, MenuItem, Stack, 
-  Dialog, DialogContent, DialogActions, Chip, InputAdornment, IconButton, Tooltip, Avatar, Divider, Alert
+  Dialog, DialogContent, DialogActions, Chip, InputAdornment, IconButton, Tooltip, Avatar, Divider, Alert,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
@@ -37,6 +39,8 @@ interface Tarea {
 }
 
 const Tareas = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { user } = useAuth();
   const canCreateTask = user?.rol === 'ADMINISTRADOR' || user?.rol === 'RRHH' || user?.rol === 'SUPERVISOR';
   const canEditTask = canCreateTask;
@@ -535,7 +539,7 @@ const handleQuickComplete = async (task: Tarea) => {
       </Paper>
 
       {/* MODAL CREAR/EDITAR */}
-       <Dialog open={open && canCreateTask} onClose={() => setOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+       <Dialog open={open && canCreateTask} onClose={() => setOpen(false)} fullScreen={isMobile} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <Box sx={{ p: 3, bgcolor: '#f8fafc', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between' }}>
             <Typography variant="h6" fontWeight="bold">{isEdit ? 'Editar Tarea' : form.tarea_padre ? 'Crear Subtarea' : 'Crear Tarea'}</Typography>
             <IconButton onClick={() => setOpen(false)}><Close /></IconButton>
@@ -582,7 +586,7 @@ const handleQuickComplete = async (task: Tarea) => {
 
       {/* MODAL DETALLES */}
       {selectedTarea && (
-        <Dialog open={openView} onClose={() => setOpenView(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <Dialog open={openView} onClose={() => setOpenView(false)} fullScreen={isMobile} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
           <Box sx={{ bgcolor: '#0f172a', p: 3, color: 'white', display: 'flex', justifyContent: 'space-between' }}>
             <Box><Typography variant="h5" fontWeight="bold">{selectedTarea.nombre}</Typography><Chip label={selectedTarea.estado} size="small" sx={{ color: 'white' }} /></Box>
             <IconButton onClick={() => setOpenView(false)} sx={{ color: 'white' }}><Close /></IconButton>

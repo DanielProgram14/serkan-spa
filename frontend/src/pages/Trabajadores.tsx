@@ -2,7 +2,9 @@
 import { 
   Box, Typography, Button, Chip, IconButton, Tooltip, Dialog, 
   DialogContent, DialogActions, TextField, MenuItem, Stack, Paper, Avatar, 
-  InputAdornment, Divider, Alert
+  InputAdornment, Divider, Alert,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
@@ -66,6 +68,8 @@ const getApiErrorMessage = (error: any, fallback: string) => {
 };
 
 const Trabajadores = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { user } = useAuth();
   const canManageWorkers = user?.rol === 'ADMINISTRADOR' || user?.rol === 'RRHH';
   const canViewWorkerDocuments = canManageWorkers || user?.rol === 'TRABAJADOR';
@@ -338,7 +342,7 @@ const columns: GridColDef[] = [
       {/* =====================================================================
           1. MODAL DE EDICIÓN / CREACIÓN (CON SELECTORES CONECTADOS)
          ===================================================================== */}
-      <Dialog open={(openCreate || openEdit) && canManageWorkers} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+      <Dialog open={(openCreate || openEdit) && canManageWorkers} onClose={handleClose} fullScreen={isMobile} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee' }}>
           <Box>
             <Typography variant="h6" fontWeight="bold">
@@ -460,7 +464,7 @@ const columns: GridColDef[] = [
           2. MODAL DE FICHA (Igual que antes, solo visualización)
          ===================================================================== */}
       {selectedWorker && (
-        <Dialog open={openView} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden' } }}>
+        <Dialog open={openView} onClose={handleClose} fullScreen={isMobile} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden' } }}>
           <Box sx={{ bgcolor: '#0f172a', p: 4, color: 'white', position: 'relative' }}>
             <IconButton onClick={handleClose} sx={{ position: 'absolute', top: 16, right: 16, color: 'rgba(255,255,255,0.5)' }}><Close /></IconButton>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
