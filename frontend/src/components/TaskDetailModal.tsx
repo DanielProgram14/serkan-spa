@@ -13,8 +13,6 @@ import {
   Paper,
   CircularProgress,
   Alert,
-  useMediaQuery,
-  useTheme,
 } from '@mui/material';
 import {
   CheckCircle,

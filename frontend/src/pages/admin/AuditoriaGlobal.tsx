@@ -207,13 +207,13 @@ const AuditoriaGlobal = () => {
       field: 'timestamp',
       headerName: 'FECHA Y HORA',
       width: 170,
-      valueGetter: (value: any, row: any) => (row?.timestamp ? new Date(row.timestamp).toLocaleString() : '-'),
+      valueGetter: (_value: any, row: any) => (row?.timestamp ? new Date(row.timestamp).toLocaleString() : '-'),
     },
     {
       field: 'user',
       headerName: 'USUARIO',
       width: 180,
-      valueGetter: (value: any, row: any) => row?.user_label || row?.user_username || 'Sistema',
+      valueGetter: (_value: any, row: any) => row?.user_label || row?.user_username || 'Sistema',
       renderCell: (params: any) => (
         <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
           {params.value}
@@ -224,7 +224,7 @@ const AuditoriaGlobal = () => {
       field: 'module',
       headerName: 'MÓDULO',
       width: 160,
-      valueGetter: (value: any, row: any) => MODULE_LABELS[row?.module] || row?.module || '-',
+      valueGetter: (_value: any, row: any) => MODULE_LABELS[row?.module] || row?.module || '-',
     },
     {
       field: 'action',
@@ -252,20 +252,20 @@ const AuditoriaGlobal = () => {
       field: 'model', 
       headerName: 'MODELO', 
       width: 170,
-      valueGetter: (value: any, row: any) => MODEL_LABELS[row?.model] || row?.model || '-' 
+      valueGetter: (_value: any, row: any) => MODEL_LABELS[row?.model] || row?.model || '-' 
     },
     { 
       field: 'object_id', 
       headerName: 'ID OBJETO', 
       width: 110, 
-      valueGetter: (value: any, row: any) => row?.object_id || '-' 
+      valueGetter: (_value: any, row: any) => row?.object_id || '-' 
     },
     {
       field: 'summary',
       headerName: 'RESUMEN / DETALLE',
       flex: 1,
       minWidth: 280,
-      valueGetter: (value: any, row: any) => generateFriendlySummary(row),
+      valueGetter: (_value: any, row: any) => generateFriendlySummary(row),
       renderCell: (params: any) => (
         <Typography variant="body2" sx={{ color: 'text.secondary', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
           {params.value}
@@ -493,7 +493,7 @@ const AuditoriaGlobal = () => {
       <Dialog 
         open={Boolean(selected)} fullScreen={isMobile} 
         onClose={() => setSelected(null)} 
-        fullScreen={isMobile} maxWidth="md" 
+        maxWidth="md" 
         fullWidth
         PaperProps={{
           sx: { borderRadius: 3, p: 1 }

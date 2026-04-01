@@ -33,7 +33,6 @@ import {
   PersonOutline, 
   BadgeOutlined, 
   WorkOutline, 
-  AccountBoxOutlined, 
   Logout, 
   EmailOutlined,
   Edit,

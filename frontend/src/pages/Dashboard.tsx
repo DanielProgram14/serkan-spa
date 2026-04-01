@@ -7,7 +7,7 @@ import {
 import {
   WarningAmber, ErrorOutline, Assignment, Description,
   Timeline, Schedule, FolderOpen, TaskAlt, Warehouse, ShoppingCart,
-  TrendingDown, CheckCircle, InfoOutlined, AddCircleOutline, DateRange, AttachMoney
+  TrendingDown, CheckCircle, InfoOutlined
 } from '@mui/icons-material';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer,

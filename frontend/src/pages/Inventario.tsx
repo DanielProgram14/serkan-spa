@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -30,7 +30,6 @@ import type { GridColDef } from '@mui/x-data-grid';
 import {
   Add,
   AssignmentInd,
-  CheckCircleOutline,
   DeleteOutline,
   EditOutlined,
   Info,

@@ -15,8 +15,6 @@ import {
   Alert,
   Divider,
   Autocomplete,
-  useMediaQuery,
-  useTheme,
 } from '@mui/material';
 import api from '../api/axios';
 
@@ -149,7 +147,7 @@ const EventoFormModal: React.FC<EventoFormModalProps> = ({
     setError(null); // Limpiar errores al cambiar tipo
   };
 
-  const handleWorkerChange = (event: any, newValue: Trabajador[]) => {
+  const handleWorkerChange = (_event: any, newValue: Trabajador[]) => {
     setFormData({
       ...formData,
       trabajadores_asignados_ids: newValue.map((t) => t.rut),

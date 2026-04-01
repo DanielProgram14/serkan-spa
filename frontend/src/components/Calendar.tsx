@@ -82,8 +82,6 @@ const Calendar: React.FC<CalendarComponentProps> = ({
 
     // Primer día del mes
     const firstDay = new Date(year, month, 1);
-    // Último día del mes
-    const lastDay = new Date(year, month + 1, 0);
 
     // Días del mes anterior que se muestran
     const startDate = new Date(firstDay);
